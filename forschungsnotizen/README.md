@@ -15,6 +15,19 @@ Die Manuskripte aus Primachsenraum und Regelsuche dokumentieren ihre Beweise, Re
 - [Greedy-Optimalität an Thompsons Wurzel und der erste Rekord einer neuen Primachse (PDF)](begleitnotizen/thompsons-wurzel.pdf)
 - [Optimalität und Sättigung (PDF)](begleitnotizen/optimalitaet-und-saettigung.pdf)
 
+## Forschungsnotizen vom 28. November 2026
+
+| Fragestellung | Text | Datierte PDF-Fassung |
+| --- | --- | --- |
+| Wann verbessert eine dritte Primzahl erstmals den Rekord der festen Basis 2 und 127? | [Beweis und rationale Zertifikate](primachsenrekord/index.html) | [Primachsenrekord v1](primachsenrekord/primachsenrekord-v1.pdf) |
+| Welche Primquadrate und multiplikativen Familien fehlen dauerhaft in der Greedy-Folge? | [Dichteschranke und endliche Faktorzeugen](primquadrate/index.html) | [Primquadrate v1](primquadrate/primquadrate-v1.pdf) |
+| Wie schnell wächst die Folge, und wie früh sind fast alle Restklassen besetzt? | [Wachstum und Belegung](wachstum/index.html) | [Wachstum v1](wachstum/wachstum-v1.pdf) |
+| Welche Entscheidungen erzwingen schon Regeln für kleinere Primzahlen? | [Chronologische Zertifikate](chronologie/index.html) | [Chronologie v1](chronologie/chronologie-v1.pdf) |
+| Wie klein ist der mögliche Überschuss bei Verschiebung um drei? | [Datierter Nachtrag zu Golomb–Keller v6](verschiebung-drei/index.html) | [Verschiebung um drei v1](verschiebung-drei/verschiebung-drei-v1.pdf) |
+| Was folgt aus dem quantitativen Siebsatz des OpenAI-Preprints für die Jacobsthal-Funktion? | [Herleitung und Literaturstand](jacobsthal/index.html) | [Jacobsthal v1](jacobsthal/jacobsthal-v1.pdf) |
+
+Die Softwareversuche dokumentieren den [Strukturwert gekoppelter Wurzelprogramme im 381-Bit-Feld](https://github.com/carstenartur/Regelsuche/blob/5639e1af7c7e857b0c439cc3ab821d6c4c579714/docs/research/quadratic-root-programs.md) und den [prospektiven Transfer gelernter Taktiken auf zwei neue Aufgabenfamilien](https://github.com/carstenartur/Regelsuche/blob/5639e1af7c7e857b0c439cc3ab821d6c4c579714/docs/research/prospective-tactic-transfer/README.md).
+
 ## Versionsgeschichte des Golomb–Keller-Manuskripts
 
 | Version | Manuskriptdatum 2026 | Entwicklung |

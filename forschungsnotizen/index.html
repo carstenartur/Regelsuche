@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Das Golomb–Keller-Manuskript, neue Ergebnisse zur Folge A135311 und das Regelsuche-Methodenpapier mit Quellen und Prüfprogrammen.">
+  <meta name="description" content="Forschungsentwürfe zu Primachsen, Greedy-Folgen, Golomb–Keller und Jacobsthal sowie Versuche zum symbolischen Lernen in Regelsuche. Mit Beweisen und Rechenbelegen.">
   <title>Forschungsnotizen und Preprints · Regelsuche</title>
   <link rel="stylesheet" href="stil.css">
 </head>
@@ -11,8 +11,27 @@
   <header class="masthead"><a href="https://github.com/carstenartur/Regelsuche">Regelsuche</a></header>
   <main>
     <h1>Forschungsnotizen und Preprints</h1>
-    <p class="intro">Manuskripte aus Primachsenraum und Regelsuche mit Quellen, Rechenbelegen und offenen Fragen. Die mathematischen Projektentwürfe sind mit erheblicher KI-Unterstützung entstanden. Eine unabhängige fachliche Begutachtung steht aus.</p>
-    <nav aria-label="Arbeiten auf dieser Seite"><a href="#golomb-keller">Golomb–Keller</a> · <a href="#greedy">Primteiler</a> · <a href="#begleitnotizen">Begleitnotizen</a> · <a href="#methoden">Regelsuche-Methoden</a></nav>
+    <p class="intro">Manuskripte aus Primachsenraum und Regelsuche mit Beweisen, Rechenbelegen und offenen Fragen. Carsten Hammer hat das Projekt initiiert. Generative KI war an Herleitungen, Prüfprogrammen und Texten erheblich beteiligt. Eine unabhängige fachliche Begutachtung steht aus.</p>
+    <nav aria-label="Arbeiten auf dieser Seite"><a href="#november">Neue Forschungsnotizen</a> · <a href="#golomb-keller">Golomb–Keller</a> · <a href="#greedy">Primteiler</a> · <a href="#begleitnotizen">Begleitnotizen</a> · <a href="#methoden">Regelsuche-Methoden</a></nav>
+
+    <section class="entry" id="november">
+      <p class="meta">28. November 2026 · Deutsche Arbeitsfassungen</p>
+      <h2>Neue Forschungsnotizen</h2>
+      <dl class="papers">
+        <dt><a href="primachsenrekord/">Der erste Rekord einer dritten Primachse</a> · <a aria-label="Der erste Rekord einer dritten Primachse als PDF" href="primachsenrekord/primachsenrekord-v1.pdf">PDF</a></dt>
+        <dd>Bei der festen Basis {2, 127} gibt es eine Primzahl <i>q</i>, die den Rekord erstmals bei <i>q</i><sup>31</sup> verbessert. Für <i>q</i> = 191 lässt sich ein erster Gewinn bei Exponent 7 vollständig nachrechnen.</dd>
+        <dt><a href="primquadrate/">Welche Primquadrate dauerhaft fehlen</a> · <a aria-label="Welche Primquadrate dauerhaft fehlen als PDF" href="primquadrate/primquadrate-v1.pdf">PDF</a></dt>
+        <dd>Unter den Primzahlen mit Rest 3 modulo 4 hat die Menge, deren Quadrat in der Folge 2<i>G</i> + 1 niemals vorkommt, eine untere relative Dichte von mehr als 82,60 %. Drei kleine Moduln reichen für ein Beispiel mit ganzen unendlichen Familien.</dd>
+        <dt><a href="wachstum/">Wie viele Greedy-Werte vor der Quadratgrenze liegen</a> · <a aria-label="Wachstum und Restklassenbelegung als PDF" href="wachstum/wachstum-v1.pdf">PDF</a></dt>
+        <dd>Eine untere Schranke für die Anzahl der aufgenommenen Werte erklärt, warum bei fast allen betrachteten Primzahlen früh fast alle Restklassen mehrfach vertreten sind.</dd>
+        <dt><a href="chronologie/">Kurze Zertifikate für Greedy-Entscheidungen</a> · <a aria-label="Chronologische Zertifikate als PDF" href="chronologie/chronologie-v1.pdf">PDF</a></dt>
+        <dd>Wie sich mit kleineren Primmoduln der Sättigungszeitpunkt 60.530 modulo 1.217 und die spätere Ablehnung von 62.816 nachweisen lassen.</dd>
+        <dt><a href="verschiebung-drei/">Golomb–Keller bei Verschiebung um drei</a> · <a aria-label="Nachtrag zur Verschiebung um drei als PDF" href="verschiebung-drei/verschiebung-drei-v1.pdf">PDF</a></dt>
+        <dd>Der Nachtrag zu v6 verschärft die Schranke für den möglichen Überschuss auf 10<sup>−14.764.337</sup>. Die Frage nach exakter Gleichheit bleibt offen.</dd>
+        <dt><a href="jacobsthal/">Eine Folgerung für die Jacobsthal-Funktion</a> · <a aria-label="Folgerung für die Jacobsthal-Funktion als PDF" href="jacobsthal/jacobsthal-v1.pdf">PDF</a></dt>
+        <dd>Ein quantitatives Siebresultat des OpenAI-Preprints liefert eine zusätzliche Potenz von log&nbsp;<i>k</i> im Nenner der formulierten Jacobsthal-Schranke. Die Notiz legt die Herleitung und den Stand der Prioritätsfrage offen.</dd>
+      </dl>
+    </section>
 
     <article class="entry" id="golomb-keller">
       <p class="meta">Review-Entwurf v6 · 20. November 2026 · Englisch</p>
@@ -62,6 +81,9 @@
       <h2 lang="en">Claim-Bounded Autonomous Symbolic Rule Discovery with Machine-Checkable Evidence</h2>
       <p>Wie gewinnt Regelsuche aus eigenen Suchläufen neue Rechenregeln, und welche helfen bei späteren Aufgaben? Die Belegübersicht führt die Versuche und ausstehenden Prüfungen zu den einzelnen Aussagen auf.</p>
       <p><a href="https://github.com/carstenartur/Regelsuche/blob/main/paper/manuscript.md">Methodenmanuskript lesen</a> · <a href="https://github.com/carstenartur/Regelsuche/blob/main/paper/claims-and-evidence.md">Aussagen und Belege</a></p>
+      <h3>Zwei Versuche aus dem November</h3>
+      <p>Bei gekoppelten Wurzelprogrammen für ein 381-Bit-Feld sank der Strukturwert von 1.855 auf 1.235. Die Suche nach dem günstigeren Programm erforderte mehr Arbeit. Ein Laufzeitvorteil gegenüber Bouncy Castle ist offen. <a href="https://github.com/carstenartur/Regelsuche/blob/5639e1af7c7e857b0c439cc3ab821d6c4c579714/docs/research/quadratic-root-programs.md">Versuchsaufbau und Reproduktion</a></p>
+      <p>Gelernte Taktiken sparten auf 1.024 bekannten Aufgaben mit verbessertem Prüfer 21.948 logische Arbeitseinheiten gegenüber der Ausführung ohne diese Vorschläge. Mit dem früheren Prüfer waren es 8.648. Auf zwei neuen Aufgabenfamilien passte keines der sechs neuen Muster. Innerhalb des Budgets löste die gelernte Auswahl 256 bzw. 192 Fälle, die primitive Suche 352 bzw. 320. <a href="https://github.com/carstenartur/Regelsuche/blob/5639e1af7c7e857b0c439cc3ab821d6c4c579714/docs/research/prospective-tactic-transfer/README.md">Vergleich, Rohdaten und Auswertung</a></p>
     </article>
   </main>
   <footer class="screen-only"><a href="SHA256SUMS">SHA-256-Prüfsummen der Downloads</a> · <a href="https://github.com/carstenartur/Regelsuche/issues">Korrekturen und Literaturhinweise auf GitHub</a></footer>

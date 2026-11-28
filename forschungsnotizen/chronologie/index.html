@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Endliche Restklassenzertifikate für zwei Sättigungszeiten, einen Ausschluss und zwei Aufnahmen der Greedy-Folge A135311. Mit selbständig ausführbarem Prüfer.">
+  <title>Kurze Zertifikate für die Greedy-Folge A135311 · Regelsuche</title>
+  <link rel="stylesheet" href="../stil.css">
+  <style>
+    @media print {
+      body { font-size: 10.5pt; line-height: 1.3; }
+      .intro { font-size: 13pt; margin-bottom: 3mm; }
+      h2 { margin-top: 4mm; }
+      table { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <header class="screen-only"><a href="../">Regelsuche · Forschungsnotizen und Preprints</a></header>
+  <main><article>
+    <p class="meta">Primachsenraum · Forschungsnotiz · Arbeitsfassung 1 vom 28. November 2026</p>
+    <h1>Kurze Zertifikate für die Greedy-Folge A135311</h1>
+    <p class="intro">Ob 62 816 zur Greedy-Folge gehört, lässt sich aus Regeln für Primzahlen unter 751 entscheiden. Die entscheidende Sperre kommt von der größeren Primzahl 1 217. Wann modulo 1 217 nur noch eine Klasse frei ist, ergibt sich aus 61 gezielt ausgewählten Aufnahmen nach einem sicheren Anfangsstück.</p>
+    <p class="screen-only"><a href="chronologie-v1.pdf">Notiz als PDF</a> · <a href="pruefen.py" download>Prüfer und Zertifikate (Python)</a></p>
+
+    <h2>Folge und Fragestellung</h2>
+    <p>Die Folge <i>G</i> beginnt mit 0. Wir prüfen alle größeren ganzen Zahlen in aufsteigender Reihenfolge. Eine Zahl wird genau dann aufgenommen, wenn nach ihrer Aufnahme modulo jeder Primzahl mindestens eine Restklasse frei bleibt. So beginnt <i>G</i> mit 0, 2, 6, 8, 12, 18. Sobald modulo einer Primzahl <i>q</i> genau eine Klasse frei ist, bleibt diese für immer frei. Mit <i>T</i><sub>q</sub> bezeichnen wir das erste Folgenglied, an dem dies eintritt, mit <i>b</i><sub>q</sub> den fehlenden Rest. Beispielsweise ist <i>T</i><sub>7</sub> = 18 und <i>b</i><sub>7</sub> = 3.</p>
+    <p>Die Folgenglieder und Sättigungsdaten lassen sich direkt berechnen. Hier fragen wir, wie wenig Information einen einzelnen Schluss schon trägt. Die Ausgangsdaten nennen ausschließlich die Sättigungszeiten und fehlenden Reste kleinerer Primzahlen im betrachteten Fenster. Auch die Mitgliedschaft der ausgewählten Zeugen wird erst im Beweis gewonnen.</p>
+
+    <h2>Der erste Sperrzeitpunkt</h2>
+    <p>Zur Schwelle <i>p</i> bilde man die endliche Kandidatenmenge <i>S</i>. Durchsuche alle ganzen Zahlen von 0 bis zur jeweiligen Fenstergrenze. Streiche für jede Primzahl <i>s</i> &lt; <i>p</i> jeden Kandidaten <i>u</i> mit <i>u</i> &gt; <i>T</i><sub>s</sub> und <i>u</i> ≡ <i>b</i><sub>s</sub> (mod <i>s</i>). Jeder echte Greedy-Term des Fensters liegt in <i>S</i>. Durch eine kleine Primzahl kann nun kein Punkt von <i>S</i> mehr ausscheiden.</p>
+    <p>Zum Nachweis eines sicheren Anfangsstücks genügt ein endlicher Test. Falls <i>S</i> bis einschließlich <i>H</i> für jede Primzahl <i>q</i> ≥ <i>p</i> mindestens eine Klasse frei lässt, sind alle Punkte von <i>S</i> bis <i>H</i> echte Folgenglieder. Bei der Entscheidung an einem solchen Punkt bleibt für jedes große <i>q</i> sogar im gesamten betrachteten Anfangsstück Platz. Zu prüfen sind höchstens die Primzahlen bis |<i>S</i>| + 1.</p>
+    <p>Für einen späteren Kandidaten <i>u</i> kann <i>q</i> nur dann sperren, wenn sämtliche von <i>u</i> mod <i>q</i> verschiedenen Reste in <i>S</i> schon <em>streng vor</em> <i>u</i> vorkommen. Ein bereits bewiesener früherer Greedy-Term mit demselben Rest wie <i>u</i> schließt auch diese Sperre aus. Fallen so alle möglichen Sperren weg, folgt <i>u</i> ∈ <i>G</i>. Dieser Schluss lässt sich für weitere Kandidaten wiederverwenden.</p>
+
+    <h2>Die Ausschlussurkunde für 62 816</h2>
+    <p>Wir verwenden <i>p</i> = 751 und untersuchen das Fenster bis 62 816. Der Test bestätigt alle 2 690 Kandidaten bis <i>H</i> = 25 160. Für die Sättigung modulo 751 genügen anschließend die vier geprüften Aufnahmen 25 538, 30 176, 33 032 und 47 796. Das kleinere Sieb selbst erreicht erstmals bei 47 796 die Zahl von 750 belegten Klassen. Zu diesem Zeitpunkt erreichen auch die bewiesenen Terme 750 Klassen. Daher gilt <i>T</i><sub>751</sub> = 47 796 und <i>b</i><sub>751</sub> = 375.</p>
+    <p>Modulo 1 217 belegt das Anfangsstück 1 158 Klassen. Die Urkunde weist weitere 58 Klassen anhand von 61 Aufnahmen nach. Bei 59 Aufnahmen genügen die Anfangszeugen oder eine nachweislich noch leere andere Pflichtklasse. Die beiden übrigen verwenden unter anderem die folgenden Kollisionen bereits bestätigter Punkte.</p>
+    <table>
+      <caption>Frühere Folgenglieder mit demselben Rest</caption>
+      <thead><tr><th scope="col">Kandidat</th><th scope="col">Mögliche Sperre</th><th scope="col">Nachweis</th></tr></thead>
+      <tbody>
+        <tr><td>59 540</td><td>1 013</td><td>59 540 − 29 150 = 30 × 1 013</td></tr>
+        <tr><td>60 530</td><td>857</td><td>60 530 − 26 250 = 40 × 857</td></tr>
+        <tr><td>60 530</td><td>1 153</td><td>60 530 − 25 940 = 30 × 1 153</td></tr>
+      </tbody>
+    </table>
+    <p>Im oberen Sieb erreicht die Zahl der belegten Klassen erstmals bei 60 530 den Wert 1 216. Die bewiesenen Aufnahmen und das Anfangsstück belegen dort ebenfalls 1 216 Klassen. Es fehlt der Rest 749. Damit gelten <i>T</i><sub>1217</sub> = 60 530 und <i>b</i><sub>1217</sub> = 749. Da 62 816 = 51 × 1 217 + 749, wird 62 816 ausgeschlossen. Die vollständige Liste der 61 Aufnahmen steht im Prüfer unter <code>COVER_1217</code>.</p>
+
+    <h2>Zwei erzwungene Aufnahmen</h2>
+    <p>Die bisherige Prüfung betrachtet Sperren für einen einzelnen Kandidaten. Zwei hypothetische Sperren für <em>verschiedene</em> Kandidaten können außerdem unvereinbar sein. Wenn die Ablehnung von <i>u</i> durch <i>q</i> eine bestimmte andere Restklasse in einem früheren Greedy-Term verlangt und in <i>S</i> nur ein Punkt <i>h</i> dafür infrage kommt, müsste <i>h</i> zur Folge gehören. Eine unabhängig bewiesene, dauerhaft fehlende Restklasse kann genau das ausschließen.</p>
+    <p><strong>4 248.</strong> Aus den Regeln für Primzahlen unter 103 folgt <i>T</i><sub>109</sub> = 1 610 mit fehlendem Rest 57. Für eine Ablehnung von 4 248 bleibt allein die Primzahl 157 übrig. Dann müsste ihre Klasse 122 vor 4 248 belegt sein. Der einzige Kandidat dafür ist 1 692. Er hat aber Rest 57 modulo 109, ebenso wie der ausgeschlossene Kandidat 3 218. Damit gehört 4 248 zu <i>G</i>.</p>
+    <p><strong>8 952.</strong> Aus den Regeln unter 227 und elf zusätzlichen, einzeln zertifizierten Aufnahmen folgt <i>T</i><sub>269</sub> = 7 938 mit fehlendem Rest 126. Damit ist insbesondere 13 038 ausgeschlossen. Für eine Ablehnung von 8 952 bliebe allein die Primzahl 317. Sie würde einen früheren Zeugen der Klasse 271 verlangen. Der einzige Kandidat ist 8 196, wiederum mit dem fehlenden Rest 126 modulo 269. Also gehört 8 952 zu <i>G</i>.</p>
+
+    <h2>Reproduktion und Reichweite</h2>
+    <p>Das Prüfprogramm enthält die kleinere Regeltabelle, die Listen der zusätzlichen Kandidaten sowie die zwei Konfliktzeugen. Es kontrolliert sämtliche erforderlichen Primzahlen und rekonstruiert die Restklassen aus den Zahlen selbst. Das Programm benötigt Python ab Version 3.8 und die Standardbibliothek. Der zweite Aufruf authentisiert die 132 Ausgangsregeln zusätzlich durch eine getrennte direkte Erzeugung von <i>G</i> bis 62 816.</p>
+    <pre><code>python3 pruefen.py
+python3 pruefen.py --quelle-pruefen</code></pre>
+    <p>Die Zertifikate erklären endliche, schon katalogisierte Ergebnisse. Wie früh die Sättigung für <em>jede</em> Primzahl der Form 4<i>k</i> + 3 eintreten muss, bleibt offen. Auch die kürzestmögliche Urkunde für diese Beispiele ist unbekannt.</p>
+    <p><strong>Entstehung und Prüfstand.</strong> Die Fragestellung und die Zertifikate stammen aus dem Projekt Primachsenraum. OpenAI Codex hat an der Beweisentwicklung mitgewirkt, diese Darstellung und den eigenständigen Prüfer ausgearbeitet sowie beide Prüfwege ausgeführt. Eine unabhängige fachliche Begutachtung steht aus.</p>
+    <h2>Quellen</h2>
+    <ul>
+      <li>Die OEIS führt die <a href="https://oeis.org/A135311">Greedy-Folge A135311</a> sowie R. Michael Perrys Tabellen zu den <a href="https://oeis.org/A274260">fehlenden Resten (A274260)</a> und den <a href="https://oeis.org/A274261">Sättigungsindizes (A274261)</a>. Der Index zählt die aufgenommenen Glieder. Unser <i>T</i><sub>q</sub> ist der Wert des Glieds an diesem Index.</li>
+      <li>Zum Zusammenhang mit den Zahlen 2<i>g</i> + 1 siehe die <a href="../a135311/">einführende Forschungsnotiz zur Primteilerfrage</a>. <a href="../begleitnotizen/optimalitaet-und-saettigung.pdf">Optimalität und Sättigung (PDF)</a> enthält den früheren Stand der allgemeinen Fristfrage.</li>
+    </ul>
+  </article></main>
+</body>
+</html>

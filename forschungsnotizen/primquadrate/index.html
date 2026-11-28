@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Primquadrate und erste Primvielfache in der Greedy-Folge · Regelsuche</title>
+  <meta name="description" content="Drei kleine Modulsperren schließen unendliche Familien in A135311 aus. Eine größere Zertifikatsrechnung liefert eine untere Dichteschranke von 82,60 Prozent.">
+  <link rel="stylesheet" href="../stil.css">
+  <style>
+    @media screen and (max-width: 38rem) {
+      .tabellenfenster { max-width: 100%; overflow-x: auto; }
+      .tabellenfenster th, .tabellenfenster td { padding: .35em .4em; }
+    }
+  </style>
+</head>
+<body>
+<header class="screen-only"><a href="../">Regelsuche · Forschungsnotizen und Preprints</a></header>
+<main><article>
+<p class="meta">Primachsenraum · Arbeitsfassung 1 · 28. November 2026</p>
+<h1>Primquadrate und erste Primvielfache in der Greedy-Folge</h1>
+<p>Welche Quadrate fehlen dauerhaft in der Zahlenmenge <i>J</i> = {2<i>g</i> + 1 : <i>g</i> ∈ <i>G</i>} zur kanonischen Greedy-Folge <i>G</i>? Bereits die ersten Offsets bis 282 liefern drei Sperren, die für unendlich viele Primzahlen <i>p</i> die ganze Familie (<span class="formula">73<sup><i>j</i></sup><i>p</i></span>)<sup>2</sup> ausschließen. Mit einem größeren endlichen Zertifikat lässt sich zeigen, dass für mehr als 82,60 % der Primzahlen <i>p</i> ≡ 3 (mod 4) bereits <i>p</i><sup>2</sup> dauerhaft fehlt.</p>
+<p class="screen-only"><a href="primquadrate-v1.pdf">PDF lesen</a> · <a href="primquadrate-nachweis.zip">Prüfprogramme und Rechenprotokolle (ZIP)</a></p>
+
+<h2>1. Drei Restklassen genügen für unendliche Familien</h2>
+<p>Die Menge <i>G</i> beginnt mit 0. Wir betrachten die positiven ganzen Zahlen in aufsteigender Reihenfolge und nehmen eine Zahl genau dann auf, wenn die neue Menge modulo jeder Primzahl wenigstens eine Restklasse frei lässt. Die ersten Aufnahmen sind 0, 2, 6, 8, 12 und 18. Sobald modulo einer ungeraden Primzahl ℓ nur eine Klasse frei ist, bleibt sie für alle späteren Aufnahmen gesperrt. Der Übergang von <i>g</i> zu 2<i>g</i> + 1 bildet die Klassen modulo ℓ bijektiv aufeinander ab.</p>
+<table>
+<caption>Drei durch das Greedy-Präfix bestimmte permanente Lücken</caption>
+<thead><tr><th scope="col">ℓ</th><th scope="col">Erster Offset mit nur einer Lücke</th><th scope="col">Fehlender Offsetrest</th><th scope="col">Fehlender Rest in <i>J</i></th></tr></thead>
+<tbody><tr><td>5</td><td>8</td><td>4</td><td>4</td></tr><tr><td>13</td><td>50</td><td>1</td><td>3</td></tr><tr><td>37</td><td>282</td><td>33</td><td>30</td></tr></tbody>
+</table>
+<p><strong>Satz 1.</strong> Unter den Primzahlen <i>p</i> ≡ 3 (mod 4) beträgt der Anteil, für den diese drei Regeln sämtliche (<span class="formula">73<sup><i>j</i></sup><i>p</i></span>)<sup>2</sup> mit <i>j</i> ≥ 0 ausschließen, genau <strong>23/108</strong>. Anteile beziehen sich auf den Grenzwert der Primzahlzählungen bis <i>x</i> innerhalb der angegebenen Klasse, sofern er existiert.</p>
+<p><i>Beweis.</i> Wegen 73<sup>2</sup> ≡ (−1, −1, 1) modulo (5, 13, 37) entscheidet allein die Parität von <i>j</i>. Der Rest <i>p</i><sup>2</sup> ≡ 30 (mod 37) sperrt beide Paritäten. Sonst muss entweder das Restpaar von <i>p</i><sup>2</sup> modulo (5, 13) gleich (4, 10) oder gleich (1, 3) sein. Genau dann sperren 5 und 13 zusammen beide Paritäten. Unter den 36 Einheiten modulo 37 treffen zwei den Quadratrest 30. Die beiden Restpaare zusammen treffen den Anteil 2 · (2/4) · (2/12) = 1/6. Der chinesische Restsatz und der Primzahlsatz in arithmetischen Progressionen ergeben 1 − (17/18)(5/6) = 23/108, auch bei festem Rest 3 modulo 4. Weitere Moduln können zusätzliche Familien ausschließen.</p>
+
+<h2 class="page-break">2. Eine untere Dichte für dauerhaft fehlende Primquadrate</h2>
+<p><strong>Satz 2 mit Rechenzertifikat.</strong> Setze <i>B</i> = {<i>p</i> prim, <i>p</i> ≡ 3 (mod 4) : <i>p</i><sup>2</sup> ∉ <i>J</i>}. Für das Verhältnis der Anzahl von <i>B</i> bis <i>x</i> zur Anzahl aller Primzahlen ≡ 3 (mod 4) bis <i>x</i> gilt</p>
+<p><strong>lim inf</strong><sub><i>x</i>→∞</sub> &nbsp; #<i>B</i>(<i>x</i>) / π(<i>x</i> ; 4, 3) &gt; 0,82603996449813354352.</p>
+<p><i>Beweis.</i> Das geprüfte Präfix bis Offset 500.000.000 liefert 40.589 verschiedene Primmoduln ℓ ≡ 1 (mod 4) mit genau einer Lücke in Normkoordinaten, jeweils einem Quadratrest ungleich null. Unter den weiteren 3.631 untersuchten ungesättigten Primmoduln dieser Klasse bis 2.300.000 haben 641 ausschließlich von null verschiedene quadratische Lücken. Auch bei diesen bleibt mindestens eine solche Klasse für immer frei. Andernfalls hätte jede der endlich vielen Klassen irgendwann einen ersten Vertreter und <i>G</i> wäre ab dem spätesten dieser Zeitpunkte unzulässig.</p>
+<p>Wähle an jedem der 41.230 verschiedenen Moduln einen permanent fehlenden Quadratrest. Welcher gewählt wird, beeinflusst den lokalen Anteil nicht. Genau zwei der ℓ − 1 Einheiten sind seine Quadratwurzeln. Für dieses feste endliche Modulsystem beträgt der Anteil der Primzahlen, die alle Sperren überleben, nach dem chinesischen Restsatz und dem Primzahlsatz in Progressionen exakt</p>
+<p><i>D</i> = ∏<sub>ℓ</sub> (ℓ − 3)/(ℓ − 1).</p>
+<p>Die zusätzliche Vorgabe modulo 4 ist zu allen ℓ teilerfremd. Die endlich vielen Primzahlen gleich einem der Moduln ändern die Dichte nicht. Das mit ganzen Zahlen berechnete Produkt erfüllt 0,82603996449813354352 &lt; 1 − <i>D</i> &lt; 0,82603996449813354353. Jeder vom Test ausgeschlossene Primzahlrest liefert ein dauerhaft fehlendes Quadrat. Für <i>B</i> folgt daher eine <em>untere</em> relative Dichte von mindestens 1 − <i>D</i>.</p>
+
+<h2>3. Erste Vielfache für die Primzahlen 1 modulo 4</h2>
+<p>Auf der anderen Seite der Primteilerfrage lässt sich für <strong>alle 368.306</strong> Primzahlen <i>q</i> ≡ 1 (mod 4) bis einschließlich 11.170.477 das kleinste Vielfache <i>mq</i> in <i>J</i> angeben. Im gesamten geprüften Bereich gelten <i>m</i> ≤ 181 und <i>mq</i> ≤ <i>q</i><sup>2</sup>/5. Der größte kleinste Kofaktor 181 tritt bei <i>q</i> = 1.093.777 auf. Für die Grenzprimzahl 11.170.477 ist der erste Kofaktor 149, die Norm 1.664.401.073 und der Offset 832.200.536.</p>
+<p>Alle positiven Offsets sind gerade, weil 0 bereits aufgenommen ist. Deshalb ist jede Norm in <i>J</i> gleich 1 modulo 4, und nur Kofaktoren 1, 5, 9, … kommen infrage. Das Projekt prüfte diese Kofaktoren aufsteigend im kanonischen Präfix und mit chronologischen Aufnahme- und Ablehnungszeugen darüber hinaus. Die Beilage enthält auch einen vollständigen alternativen Prüflauf bis zum Grenzoffset. Warum eine feste Kofaktorliste asymptotisch nur einen Anteil null erreicht, zeigt der <a href="kofaktoren.html">Anhang zu festen Kofaktoren</a>.</p>
+
+<h2 class="page-break">4. Eine vollständige Kette von Zweierpotenzen</h2>
+<p><strong>Satz 3.</strong> Für eine Menge von Primzahlen <i>p</i> ≡ 3 (mod 4) positiver relativer Dichte liegen <i>p</i><sup>2</sup>, <i>p</i><sup>4</sup>, <i>p</i><sup>8</sup>, <i>p</i><sup>16</sup>, … sämtlich außerhalb von <i>J</i>.</p>
+<div class="tabellenfenster" role="region" aria-label="Startklassen und Sperren" tabindex="0">
+<table>
+<caption>Die vier vorgeschriebenen Startklassen und ihre Sperren</caption>
+<thead><tr><th scope="col">ℓ</th><th scope="col">Sperre <i>b</i></th><th scope="col">Start <i>z</i> ≡ <i>p</i><sup>2</sup></th><th scope="col"><i>z</i><sup><i>t</i></sup> ≡ <i>b</i> (mod ℓ)</th></tr></thead>
+<tbody><tr><td>13</td><td>3</td><td>3</td><td><i>t</i> ≡ 1 (mod 3)</td></tr><tr><td>281</td><td>59</td><td>59</td><td><i>t</i> ≡ 1 (mod 7)</td></tr><tr><td>120.569</td><td>67.518</td><td>79.620</td><td><i>t</i> ≡ 2 (mod 7)</td></tr><tr><td>91.393</td><td>37.671</td><td>45.130</td><td><i>t</i> ≡ 11 (mod 21)</td></tr></tbody>
+</table>
+</div>
+<p><i>Beweis.</i> Alle vier Startreste sind Quadrate ungleich null. Jeder hat genau zwei Wurzeln. Die vier simultanen Vorgaben definieren daher unter den betrachteten Primzahlen eine Menge der relativen Dichte 2<sup>4</sup> / [(13−1)(281−1)(120569−1)(91393−1)] = 1/2.313.979.637.760. Die Verbotszeiten aus der letzten Spalte enthalten den gesamten Zyklus der Zweierpotenzen 1, 2, 4, 8, 16, 11 modulo 21. Für jeden dieser Exponenten <i>t</i> ist also <i>p</i><sup>2<i>t</i></sup> gesperrt. Die vier permanenten Lücken wurden in einem frisch erzeugten und unabhängig geprüften Präfix bis Offset 40.000.000 nachgerechnet.</p>
+
+<p>Ein konkreter Start ist <strong><i>p</i> = 191.160.287</strong>. Für diese Primzahl sperren 13, 281, 91.393, 53 und 181 jede Stufe. Der Prüfer quadriert den Vektor ihrer fünf Reste bis zur ersten Wiederholung und prüft in jeder Stufe einen Treffer. Auch diese fünf Sperren sind im 40-Millionen-Präfix belegt. Der archivierte 500-Millionen-Lauf liefert mit acht zyklischen Regeln und zusätzlichen Sperren für die sieben Anfangsstufen eine höhere garantierte relative Dichte von mindestens 0,000000477983413059785964. Der Beilage liegen der vollständige Prüfer und sein Ergebnis bei.</p>
+
+<h2>Prüfstand und Quellen</h2>
+<p>Der <a href="primquadrate-nachweis.zip">Reproduktionsanhang</a> enthält die Generatoren, einen zweiten Präfixprüfer, die Rechenprotokolle und die genauen Aufrufe. Der Kurztest <code>python3 pruefen.py kurz</code> bestimmt die drei ersten Sperren aus der Definition, prüft alle 1.728 Restklassen-Einheiten und rechnet die Potenzphasen nach. Für diese Fassung wurden außerdem die vier Kettensperren an 2.338.323 kanonischen Offsets sowie die beiden großen Prüfverfahren an einem Millionenpräfix kontrolliert. Die Zahlen zum 500-Millionen-Präfix und zu den 368.306 ersten Vielfachen stammen aus den archivierten Projektläufen. Der jeweilige vollständige Wiederholungsweg steht in der Beilage.</p>
+<p>Die Greedy-Folge ist bei <a href="https://oeis.org/A135311">OEIS A135311</a> beschrieben. Für die Umrechnung vollständiger Restklassen in relative Primzahldichten verwenden wir den <a href="https://pub.math.leidenuniv.nl/~evertsejh/ant14-1.pdf">Primzahlsatz in arithmetischen Progressionen, Satz 1.2</a>. Zur früheren endlichen Primteilerklassifikation siehe die <a href="../greedy-prime-offsets/Moree-2088-note.pdf">Notiz zu Ford, Luca und Moree</a>.</p>
+<p class="meta">Projekt Primachsenraum. Bei der Herleitung, Programmierung, Überarbeitung und Prüfung kamen KI-Systeme in erheblichem Umfang zum Einsatz. Die Arbeitsfassung hat kein unabhängiges fachliches Peer-Review durchlaufen.</p>
+</article></main>
+</body>
+</html>
