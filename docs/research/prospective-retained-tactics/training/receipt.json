@@ -1,0 +1,840 @@
+{
+  "acquiredAcquisition" : 75408,
+  "acquiredLoad" : 5157,
+  "calibrationSourceWork" : 21689,
+  "calibrationSources" : [ {
+    "cap" : 8192,
+    "depth" : 1,
+    "source" : "(a + 12 + 0) * 1",
+    "target" : 3
+  }, {
+    "cap" : 8192,
+    "depth" : 1,
+    "source" : "(a + 16) * (b - c) + (a + 16) * c",
+    "target" : 5
+  }, {
+    "cap" : 8192,
+    "depth" : 12,
+    "source" : "(r + 20) * (r - 20)",
+    "target" : 5
+  }, {
+    "cap" : 8192,
+    "depth" : 12,
+    "source" : "x + y * 24",
+    "target" : 1
+  }, {
+    "cap" : 8192,
+    "depth" : 12,
+    "source" : "(x + y + (z + 903)) * (x + y - (z + 903)) - z + z + 903",
+    "target" : 13
+  }, {
+    "cap" : 8192,
+    "depth" : 12,
+    "source" : "(x + y) * (z + 907) + (x + y) * y + ((x + y) * (z + 907) + (x + y) * y) + 907",
+    "target" : 13
+  }, {
+    "cap" : 8192,
+    "depth" : 12,
+    "source" : "(x + y) * 1 * (x + 1) + z * (x + 1) + 911",
+    "target" : 11
+  }, {
+    "cap" : 8192,
+    "depth" : 12,
+    "source" : "(x + y + 0) * (x + y + 0) + 915",
+    "target" : 7
+  }, {
+    "cap" : 8192,
+    "depth" : 1,
+    "source" : "(x + y + (z + 1203)) * (x + y - (z + 1203)) - z + z + 1203",
+    "target" : 13
+  }, {
+    "cap" : 8192,
+    "depth" : 1,
+    "source" : "(x + y) * (z + 1207) + (x + y) * y + ((x + y) * (z + 1207) + (x + y) * y) + 1207",
+    "target" : 13
+  }, {
+    "cap" : 8192,
+    "depth" : 1,
+    "source" : "(x + y) * 1 * (x + 1) + z * (x + 1) + 1211",
+    "target" : 11
+  }, {
+    "cap" : 8192,
+    "depth" : 1,
+    "source" : "(x + y + 0) * (x + y + 0) + 1215",
+    "target" : 7
+  }, {
+    "cap" : 8192,
+    "depth" : 32,
+    "source" : "((a + 50017) * (1 - p) + (a + 50017) * p) * (1 - q) + ((a + 50017) * (1 - p) + (a + 50017) * p) * q",
+    "target" : 3
+  }, {
+    "cap" : 256,
+    "depth" : 32,
+    "source" : "(((a + 50018) * (1 - q) + (a + 50018) * q) * (1 - r) + ((a + 50018) * (1 - q) + (a + 50018) * q) * r) * (1 - p) + (((a + 50018) * (1 - q) + (a + 50018) * q) * (1 - r) + ((a + 50018) * (1 - q) + (a + 50018) * q) * r) * p",
+    "target" : 3
+  }, {
+    "cap" : 768,
+    "depth" : 32,
+    "source" : "(((a + 50019) * (1 - r) + (a + 50019) * r) * (1 - p) + ((a + 50019) * (1 - r) + (a + 50019) * r) * p) * (1 - q) + (((a + 50019) * (1 - r) + (a + 50019) * r) * (1 - p) + ((a + 50019) * (1 - r) + (a + 50019) * r) * p) * q",
+    "target" : 3
+  }, {
+    "cap" : 768,
+    "depth" : 32,
+    "source" : "(((a + 50020) * (1 - (r + u)) + (a + 50020) * (r + u)) * (1 - (p + s)) + ((a + 50020) * (1 - (r + u)) + (a + 50020) * (r + u)) * (p + s)) * (1 - (q + t)) + (((a + 50020) * (1 - (r + u)) + (a + 50020) * (r + u)) * (1 - (p + s)) + ((a + 50020) * (1 - (r + u)) + (a + 50020) * (r + u)) * (p + s)) * (q + t)",
+    "target" : 3
+  }, {
+    "cap" : 2048,
+    "depth" : 32,
+    "source" : "(b + 60017 + e) * (b + 60017 - e) + e * e + ((c + f) * (c - f) + f * f) + ((d + g) * (d - g) + g * g)",
+    "target" : 13
+  }, {
+    "cap" : 2048,
+    "depth" : 32,
+    "source" : "(c + 60018 + f) * (c + 60018 - f) + f * f + ((b + e) * (b - e) + e * e)",
+    "target" : 9
+  }, {
+    "cap" : 768,
+    "depth" : 32,
+    "source" : "(c + 60019 + f) * (c + 60019 - f) + f * f + ((b + e) * (b - e) + e * e)",
+    "target" : 9
+  }, {
+    "cap" : 8192,
+    "depth" : 32,
+    "source" : "(c + f) * (c - f) + f * f + ((b + 60020 + e) * (b + 60020 - e) + e * e)",
+    "target" : 9
+  }, {
+    "cap" : 8192,
+    "depth" : 32,
+    "source" : "((a + 10033) * b * r + (e * f + 0)) * s + i * j",
+    "target" : 17
+  }, {
+    "cap" : 8192,
+    "depth" : 32,
+    "source" : "((a + 10034) * b * r + (e * (f - g - h) + e * h + e * g)) * s + (i * (j - k - l) + i * l + i * k)",
+    "target" : 17
+  }, {
+    "cap" : 8192,
+    "depth" : 32,
+    "source" : "(a + 10035) * b * r + (e * f + 0) * s + i * j * t",
+    "target" : 19
+  }, {
+    "cap" : 8192,
+    "depth" : 32,
+    "source" : "((a + 10036) * (b - c - d) + (a + 10036) * d + (a + 10036) * c) * r + e * f * s + (i * (j - k - l) + i * l + i * k) * t",
+    "target" : 19
+  } ],
+  "composition" : 29364,
+  "fresh" : {
+    "acceptedShapes" : 1,
+    "acquisition" : 55067,
+    "admission" : "sha256:fd14e4ee2b5c8477368799e373b6937b32c10cf89996028753e1037cc578cee1",
+    "calibration" : 26637,
+    "load" : 1953,
+    "model" : "sha256:ecf0f0f7517b193ce244d90b38a300fd3b600701eae34d996211cf512a0b6f02",
+    "schemas" : [ "checked-schema:sha256:33ffa3d707a2b6cde84caae83899a2f2a034a254a68547e950e268da02bc580e", "checked-schema:sha256:43ae9fd2f84070c03ec03fb2a5591d57b975c9f077ae0c2340a7b0bf25d92ce3", "checked-schema:sha256:53f187417be49418c5eed023879dac744493a24a8e17cbd50cd9822c93e5b9bb", "checked-schema:sha256:8b40fe005ed30435f2e75adf8b1ffbeb5038ba81abc4c3434d96fd11d6e16267", "checked-schema:sha256:a7c2edc37e4dd9f9e0caea8e1024d80501f140db9c8fe10e92e16e6a6e56d56d", "checked-schema:sha256:b3a30589cfece72d4dd4cb77ff48654f9647ab0a99224975aea6904f2e724a76" ],
+    "trials" : [ {
+      "index" : 0,
+      "primitiveSolved" : false,
+      "primitiveWork" : 79,
+      "learnedSolved" : false,
+      "learnedWork" : 140,
+      "learnedSteps" : 0
+    }, {
+      "index" : 1,
+      "primitiveSolved" : false,
+      "primitiveWork" : 71,
+      "learnedSolved" : false,
+      "learnedWork" : 145,
+      "learnedSteps" : 0
+    }, {
+      "index" : 2,
+      "primitiveSolved" : false,
+      "primitiveWork" : 84,
+      "learnedSolved" : false,
+      "learnedWork" : 183,
+      "learnedSteps" : 0
+    }, {
+      "index" : 3,
+      "primitiveSolved" : false,
+      "primitiveWork" : 37,
+      "learnedSolved" : false,
+      "learnedWork" : 97,
+      "learnedSteps" : 0
+    }, {
+      "index" : 4,
+      "primitiveSolved" : true,
+      "primitiveWork" : 116,
+      "learnedSolved" : true,
+      "learnedWork" : 260,
+      "learnedSteps" : 1
+    }, {
+      "index" : 5,
+      "primitiveSolved" : true,
+      "primitiveWork" : 132,
+      "learnedSolved" : true,
+      "learnedWork" : 302,
+      "learnedSteps" : 1
+    }, {
+      "index" : 6,
+      "primitiveSolved" : true,
+      "primitiveWork" : 122,
+      "learnedSolved" : true,
+      "learnedWork" : 266,
+      "learnedSteps" : 0
+    }, {
+      "index" : 7,
+      "primitiveSolved" : true,
+      "primitiveWork" : 145,
+      "learnedSolved" : true,
+      "learnedWork" : 250,
+      "learnedSteps" : 0
+    }, {
+      "index" : 8,
+      "primitiveSolved" : false,
+      "primitiveWork" : 117,
+      "learnedSolved" : true,
+      "learnedWork" : 260,
+      "learnedSteps" : 1
+    }, {
+      "index" : 9,
+      "primitiveSolved" : false,
+      "primitiveWork" : 173,
+      "learnedSolved" : true,
+      "learnedWork" : 302,
+      "learnedSteps" : 1
+    }, {
+      "index" : 10,
+      "primitiveSolved" : false,
+      "primitiveWork" : 107,
+      "learnedSolved" : false,
+      "learnedWork" : 208,
+      "learnedSteps" : 0
+    }, {
+      "index" : 11,
+      "primitiveSolved" : false,
+      "primitiveWork" : 121,
+      "learnedSolved" : false,
+      "learnedWork" : 199,
+      "learnedSteps" : 0
+    }, {
+      "index" : 12,
+      "primitiveSolved" : true,
+      "primitiveWork" : 314,
+      "learnedSolved" : true,
+      "learnedWork" : 735,
+      "learnedSteps" : 0
+    }, {
+      "index" : 13,
+      "primitiveSolved" : false,
+      "primitiveWork" : 276,
+      "learnedSolved" : false,
+      "learnedWork" : 255,
+      "learnedSteps" : 0
+    }, {
+      "index" : 14,
+      "primitiveSolved" : true,
+      "primitiveWork" : 576,
+      "learnedSolved" : false,
+      "learnedWork" : 778,
+      "learnedSteps" : 0
+    }, {
+      "index" : 15,
+      "primitiveSolved" : true,
+      "primitiveWork" : 648,
+      "learnedSolved" : false,
+      "learnedWork" : 774,
+      "learnedSteps" : 0
+    }, {
+      "index" : 16,
+      "primitiveSolved" : true,
+      "primitiveWork" : 638,
+      "learnedSolved" : false,
+      "learnedWork" : 2086,
+      "learnedSteps" : 0
+    }, {
+      "index" : 17,
+      "primitiveSolved" : true,
+      "primitiveWork" : 362,
+      "learnedSolved" : true,
+      "learnedWork" : 1038,
+      "learnedSteps" : 0
+    }, {
+      "index" : 18,
+      "primitiveSolved" : true,
+      "primitiveWork" : 362,
+      "learnedSolved" : false,
+      "learnedWork" : 771,
+      "learnedSteps" : 0
+    }, {
+      "index" : 19,
+      "primitiveSolved" : true,
+      "primitiveWork" : 364,
+      "learnedSolved" : true,
+      "learnedWork" : 1037,
+      "learnedSteps" : 0
+    }, {
+      "index" : 20,
+      "primitiveSolved" : true,
+      "primitiveWork" : 68,
+      "learnedSolved" : true,
+      "learnedWork" : 141,
+      "learnedSteps" : 0
+    }, {
+      "index" : 21,
+      "primitiveSolved" : true,
+      "primitiveWork" : 536,
+      "learnedSolved" : true,
+      "learnedWork" : 645,
+      "learnedSteps" : 2
+    }, {
+      "index" : 22,
+      "primitiveSolved" : true,
+      "primitiveWork" : 72,
+      "learnedSolved" : true,
+      "learnedWork" : 181,
+      "learnedSteps" : 0
+    }, {
+      "index" : 23,
+      "primitiveSolved" : true,
+      "primitiveWork" : 562,
+      "learnedSolved" : true,
+      "learnedWork" : 673,
+      "learnedSteps" : 2
+    } ]
+  },
+  "old" : {
+    "acceptedShapes" : 0,
+    "acquisition" : 9130,
+    "admission" : "sha256:b3ba180841ef07d576b5e2187a317cfc7656e305bd023d73d96b643bc2cc4fb6",
+    "calibration" : 26445,
+    "load" : 1620,
+    "model" : "sha256:9eba3e4574b62cd88ef886d39909f84e46fce12975edf7c958fd1729abf40e24",
+    "schemas" : [ "checked-schema:sha256:0da2c807a44fecb093cfb57826649dc46d14d3380913f40b38afa5f13b8e04c0", "checked-schema:sha256:32e844f6ca2005ad9e8dbf476a82648021d4376043bd713c5649ef552b778ad9", "checked-schema:sha256:370b2978bad71a99ffbc833c2e7d54b04d6edb315867ead9131d64b74a204fb2", "checked-schema:sha256:61c017111e92d3a11dd9645e02a1a79a4f14e31ad647a3634521c03b136efe20", "checked-schema:sha256:8ce5c7f4e2bea027bd55a1ceb398113fc5926be8970bf1fbc766220a0c409130", "checked-schema:sha256:a16898a2880f1b951724e203808681c5287e38c0877a1b15092301f02f8ecb23", "checked-schema:sha256:a7c2edc37e4dd9f9e0caea8e1024d80501f140db9c8fe10e92e16e6a6e56d56d" ],
+    "trials" : [ {
+      "index" : 0,
+      "primitiveSolved" : false,
+      "primitiveWork" : 79,
+      "learnedSolved" : false,
+      "learnedWork" : 99,
+      "learnedSteps" : 0
+    }, {
+      "index" : 1,
+      "primitiveSolved" : false,
+      "primitiveWork" : 71,
+      "learnedSolved" : true,
+      "learnedWork" : 183,
+      "learnedSteps" : 1
+    }, {
+      "index" : 2,
+      "primitiveSolved" : false,
+      "primitiveWork" : 84,
+      "learnedSolved" : false,
+      "learnedWork" : 184,
+      "learnedSteps" : 0
+    }, {
+      "index" : 3,
+      "primitiveSolved" : false,
+      "primitiveWork" : 37,
+      "learnedSolved" : false,
+      "learnedWork" : 48,
+      "learnedSteps" : 0
+    }, {
+      "index" : 4,
+      "primitiveSolved" : true,
+      "primitiveWork" : 116,
+      "learnedSolved" : true,
+      "learnedWork" : 249,
+      "learnedSteps" : 0
+    }, {
+      "index" : 5,
+      "primitiveSolved" : true,
+      "primitiveWork" : 132,
+      "learnedSolved" : true,
+      "learnedWork" : 244,
+      "learnedSteps" : 0
+    }, {
+      "index" : 6,
+      "primitiveSolved" : true,
+      "primitiveWork" : 122,
+      "learnedSolved" : true,
+      "learnedWork" : 194,
+      "learnedSteps" : 0
+    }, {
+      "index" : 7,
+      "primitiveSolved" : true,
+      "primitiveWork" : 145,
+      "learnedSolved" : true,
+      "learnedWork" : 214,
+      "learnedSteps" : 0
+    }, {
+      "index" : 8,
+      "primitiveSolved" : false,
+      "primitiveWork" : 117,
+      "learnedSolved" : false,
+      "learnedWork" : 225,
+      "learnedSteps" : 0
+    }, {
+      "index" : 9,
+      "primitiveSolved" : false,
+      "primitiveWork" : 173,
+      "learnedSolved" : false,
+      "learnedWork" : 302,
+      "learnedSteps" : 0
+    }, {
+      "index" : 10,
+      "primitiveSolved" : false,
+      "primitiveWork" : 107,
+      "learnedSolved" : false,
+      "learnedWork" : 170,
+      "learnedSteps" : 0
+    }, {
+      "index" : 11,
+      "primitiveSolved" : false,
+      "primitiveWork" : 121,
+      "learnedSolved" : false,
+      "learnedWork" : 174,
+      "learnedSteps" : 0
+    }, {
+      "index" : 12,
+      "primitiveSolved" : true,
+      "primitiveWork" : 314,
+      "learnedSolved" : true,
+      "learnedWork" : 575,
+      "learnedSteps" : 2
+    }, {
+      "index" : 13,
+      "primitiveSolved" : false,
+      "primitiveWork" : 276,
+      "learnedSolved" : false,
+      "learnedWork" : 324,
+      "learnedSteps" : 0
+    }, {
+      "index" : 14,
+      "primitiveSolved" : true,
+      "primitiveWork" : 576,
+      "learnedSolved" : false,
+      "learnedWork" : 991,
+      "learnedSteps" : 3
+    }, {
+      "index" : 15,
+      "primitiveSolved" : true,
+      "primitiveWork" : 648,
+      "learnedSolved" : false,
+      "learnedWork" : 1026,
+      "learnedSteps" : 3
+    }, {
+      "index" : 16,
+      "primitiveSolved" : true,
+      "primitiveWork" : 638,
+      "learnedSolved" : true,
+      "learnedWork" : 1954,
+      "learnedSteps" : 0
+    }, {
+      "index" : 17,
+      "primitiveSolved" : true,
+      "primitiveWork" : 362,
+      "learnedSolved" : true,
+      "learnedWork" : 1010,
+      "learnedSteps" : 0
+    }, {
+      "index" : 18,
+      "primitiveSolved" : true,
+      "primitiveWork" : 362,
+      "learnedSolved" : false,
+      "learnedWork" : 789,
+      "learnedSteps" : 0
+    }, {
+      "index" : 19,
+      "primitiveSolved" : true,
+      "primitiveWork" : 364,
+      "learnedSolved" : true,
+      "learnedWork" : 1002,
+      "learnedSteps" : 0
+    }, {
+      "index" : 20,
+      "primitiveSolved" : true,
+      "primitiveWork" : 68,
+      "learnedSolved" : true,
+      "learnedWork" : 128,
+      "learnedSteps" : 0
+    }, {
+      "index" : 21,
+      "primitiveSolved" : true,
+      "primitiveWork" : 536,
+      "learnedSolved" : true,
+      "learnedWork" : 642,
+      "learnedSteps" : 2
+    }, {
+      "index" : 22,
+      "primitiveSolved" : true,
+      "primitiveWork" : 72,
+      "learnedSolved" : true,
+      "learnedWork" : 139,
+      "learnedSteps" : 0
+    }, {
+      "index" : 23,
+      "primitiveSolved" : true,
+      "primitiveWork" : 562,
+      "learnedSolved" : true,
+      "learnedWork" : 692,
+      "learnedSteps" : 2
+    } ]
+  },
+  "priorComposition" : 9093,
+  "priorUnion" : {
+    "acceptedShapes" : 1,
+    "acquisition" : 64197,
+    "admission" : "sha256:0327f0d1315b4226738ade0213df278f3dc0ffa1d088c4a5e9063a8c8220d8bf",
+    "calibration" : 28336,
+    "load" : 3573,
+    "model" : "sha256:7201ab57f3b49ed51087d7ebac2fc116beb77dee19cdcadfa5170b6748929787",
+    "schemas" : [ "checked-schema:sha256:0da2c807a44fecb093cfb57826649dc46d14d3380913f40b38afa5f13b8e04c0", "checked-schema:sha256:32e844f6ca2005ad9e8dbf476a82648021d4376043bd713c5649ef552b778ad9", "checked-schema:sha256:33ffa3d707a2b6cde84caae83899a2f2a034a254a68547e950e268da02bc580e", "checked-schema:sha256:370b2978bad71a99ffbc833c2e7d54b04d6edb315867ead9131d64b74a204fb2", "checked-schema:sha256:43ae9fd2f84070c03ec03fb2a5591d57b975c9f077ae0c2340a7b0bf25d92ce3", "checked-schema:sha256:53f187417be49418c5eed023879dac744493a24a8e17cbd50cd9822c93e5b9bb", "checked-schema:sha256:61c017111e92d3a11dd9645e02a1a79a4f14e31ad647a3634521c03b136efe20", "checked-schema:sha256:8b40fe005ed30435f2e75adf8b1ffbeb5038ba81abc4c3434d96fd11d6e16267", "checked-schema:sha256:8ce5c7f4e2bea027bd55a1ceb398113fc5926be8970bf1fbc766220a0c409130", "checked-schema:sha256:a16898a2880f1b951724e203808681c5287e38c0877a1b15092301f02f8ecb23", "checked-schema:sha256:a7c2edc37e4dd9f9e0caea8e1024d80501f140db9c8fe10e92e16e6a6e56d56d", "checked-schema:sha256:b3a30589cfece72d4dd4cb77ff48654f9647ab0a99224975aea6904f2e724a76" ],
+    "trials" : [ {
+      "index" : 0,
+      "primitiveSolved" : false,
+      "primitiveWork" : 79,
+      "learnedSolved" : false,
+      "learnedWork" : 140,
+      "learnedSteps" : 0
+    }, {
+      "index" : 1,
+      "primitiveSolved" : false,
+      "primitiveWork" : 71,
+      "learnedSolved" : true,
+      "learnedWork" : 183,
+      "learnedSteps" : 1
+    }, {
+      "index" : 2,
+      "primitiveSolved" : false,
+      "primitiveWork" : 84,
+      "learnedSolved" : false,
+      "learnedWork" : 183,
+      "learnedSteps" : 0
+    }, {
+      "index" : 3,
+      "primitiveSolved" : false,
+      "primitiveWork" : 37,
+      "learnedSolved" : false,
+      "learnedWork" : 97,
+      "learnedSteps" : 0
+    }, {
+      "index" : 4,
+      "primitiveSolved" : true,
+      "primitiveWork" : 116,
+      "learnedSolved" : true,
+      "learnedWork" : 260,
+      "learnedSteps" : 1
+    }, {
+      "index" : 5,
+      "primitiveSolved" : true,
+      "primitiveWork" : 132,
+      "learnedSolved" : true,
+      "learnedWork" : 302,
+      "learnedSteps" : 1
+    }, {
+      "index" : 6,
+      "primitiveSolved" : true,
+      "primitiveWork" : 122,
+      "learnedSolved" : true,
+      "learnedWork" : 291,
+      "learnedSteps" : 0
+    }, {
+      "index" : 7,
+      "primitiveSolved" : true,
+      "primitiveWork" : 145,
+      "learnedSolved" : true,
+      "learnedWork" : 269,
+      "learnedSteps" : 0
+    }, {
+      "index" : 8,
+      "primitiveSolved" : false,
+      "primitiveWork" : 117,
+      "learnedSolved" : true,
+      "learnedWork" : 260,
+      "learnedSteps" : 1
+    }, {
+      "index" : 9,
+      "primitiveSolved" : false,
+      "primitiveWork" : 173,
+      "learnedSolved" : true,
+      "learnedWork" : 302,
+      "learnedSteps" : 1
+    }, {
+      "index" : 10,
+      "primitiveSolved" : false,
+      "primitiveWork" : 107,
+      "learnedSolved" : false,
+      "learnedWork" : 231,
+      "learnedSteps" : 0
+    }, {
+      "index" : 11,
+      "primitiveSolved" : false,
+      "primitiveWork" : 121,
+      "learnedSolved" : false,
+      "learnedWork" : 201,
+      "learnedSteps" : 0
+    }, {
+      "index" : 12,
+      "primitiveSolved" : true,
+      "primitiveWork" : 314,
+      "learnedSolved" : true,
+      "learnedWork" : 579,
+      "learnedSteps" : 2
+    }, {
+      "index" : 13,
+      "primitiveSolved" : false,
+      "primitiveWork" : 276,
+      "learnedSolved" : false,
+      "learnedWork" : 320,
+      "learnedSteps" : 0
+    }, {
+      "index" : 14,
+      "primitiveSolved" : true,
+      "primitiveWork" : 576,
+      "learnedSolved" : false,
+      "learnedWork" : 987,
+      "learnedSteps" : 3
+    }, {
+      "index" : 15,
+      "primitiveSolved" : true,
+      "primitiveWork" : 648,
+      "learnedSolved" : false,
+      "learnedWork" : 1025,
+      "learnedSteps" : 3
+    }, {
+      "index" : 16,
+      "primitiveSolved" : true,
+      "primitiveWork" : 638,
+      "learnedSolved" : false,
+      "learnedWork" : 2087,
+      "learnedSteps" : 0
+    }, {
+      "index" : 17,
+      "primitiveSolved" : true,
+      "primitiveWork" : 362,
+      "learnedSolved" : true,
+      "learnedWork" : 1103,
+      "learnedSteps" : 0
+    }, {
+      "index" : 18,
+      "primitiveSolved" : true,
+      "primitiveWork" : 362,
+      "learnedSolved" : false,
+      "learnedWork" : 775,
+      "learnedSteps" : 0
+    }, {
+      "index" : 19,
+      "primitiveSolved" : true,
+      "primitiveWork" : 364,
+      "learnedSolved" : true,
+      "learnedWork" : 1096,
+      "learnedSteps" : 0
+    }, {
+      "index" : 20,
+      "primitiveSolved" : true,
+      "primitiveWork" : 68,
+      "learnedSolved" : true,
+      "learnedWork" : 167,
+      "learnedSteps" : 0
+    }, {
+      "index" : 21,
+      "primitiveSolved" : true,
+      "primitiveWork" : 536,
+      "learnedSolved" : true,
+      "learnedWork" : 657,
+      "learnedSteps" : 2
+    }, {
+      "index" : 22,
+      "primitiveSolved" : true,
+      "primitiveWork" : 72,
+      "learnedSolved" : true,
+      "learnedWork" : 217,
+      "learnedSteps" : 0
+    }, {
+      "index" : 23,
+      "primitiveSolved" : true,
+      "primitiveWork" : 562,
+      "learnedSolved" : true,
+      "learnedWork" : 709,
+      "learnedSteps" : 2
+    } ]
+  },
+  "union" : {
+    "acceptedShapes" : 4,
+    "acquisition" : 139605,
+    "admission" : "sha256:b0d1e23a4bc3997116e83d32e7eeb3bed5905600af53c8977b5fe3bfc84a4f3b",
+    "calibration" : 26907,
+    "load" : 8730,
+    "model" : "sha256:125788db3ea581d9daa37afdb8c3f9455298e53819dfcf6417fc7352aa5c10bc",
+    "schemas" : [ "checked-schema:sha256:00f0a791f2e717a3d4c8c54c55c95b8c6b5ea5f00e66adaf7beb0d13d4f268a5", "checked-schema:sha256:0da2c807a44fecb093cfb57826649dc46d14d3380913f40b38afa5f13b8e04c0", "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d", "checked-schema:sha256:154dd85009fe709767df3f80d1a8c0121348cee1e126b3472162d88d9726c107", "checked-schema:sha256:18629d66221bf0a30731e44d4fcbe2387a8d22f012fb82c0a9cbda1e415ac89e", "checked-schema:sha256:32e844f6ca2005ad9e8dbf476a82648021d4376043bd713c5649ef552b778ad9", "checked-schema:sha256:33ffa3d707a2b6cde84caae83899a2f2a034a254a68547e950e268da02bc580e", "checked-schema:sha256:370b2978bad71a99ffbc833c2e7d54b04d6edb315867ead9131d64b74a204fb2", "checked-schema:sha256:376d4dd0cdf79fed0d5f414792305e3e99bd16acb32e7aab4d7b57d912ecb2f0", "checked-schema:sha256:43ae9fd2f84070c03ec03fb2a5591d57b975c9f077ae0c2340a7b0bf25d92ce3", "checked-schema:sha256:509bf2a36fdefd51a7099e99b3d9a286ef7bb78cdbcbeb0c4bf72b3727c1fdcf", "checked-schema:sha256:53f187417be49418c5eed023879dac744493a24a8e17cbd50cd9822c93e5b9bb", "checked-schema:sha256:5c2a7304feee6588d4102a8f1a6eddcd2754f660711f0d0360ea7a5a4715d988", "checked-schema:sha256:61c017111e92d3a11dd9645e02a1a79a4f14e31ad647a3634521c03b136efe20", "checked-schema:sha256:79eedf4b777afb3accb85094d7b2b56403e91c8e2b6eeb89817d4f13b5001a17", "checked-schema:sha256:8b40fe005ed30435f2e75adf8b1ffbeb5038ba81abc4c3434d96fd11d6e16267", "checked-schema:sha256:8ce5c7f4e2bea027bd55a1ceb398113fc5926be8970bf1fbc766220a0c409130", "checked-schema:sha256:91e5a97ce1471a0fdbf7184a8b6bfb14337a22d02da8e74f6c75b0a35d7d26fb", "checked-schema:sha256:a16898a2880f1b951724e203808681c5287e38c0877a1b15092301f02f8ecb23", "checked-schema:sha256:a7c2edc37e4dd9f9e0caea8e1024d80501f140db9c8fe10e92e16e6a6e56d56d", "checked-schema:sha256:a9a03de38d89f13cf6ac3ca20a5543696beeef82a62f62825b3bbc771615b604", "checked-schema:sha256:af134a58b64b207634f2178f5c46a7d2bb40a4483f47c7a0df6f8c02f0430dd0", "checked-schema:sha256:b3a30589cfece72d4dd4cb77ff48654f9647ab0a99224975aea6904f2e724a76", "checked-schema:sha256:c242dd954261b32d2e94dca16d265ac281540900d876430e1f002ebf4dbe14c7", "checked-schema:sha256:d6b15c1d38636787b804f361fa889607eef9c77a779200b5df5c3fb341d04afc", "checked-schema:sha256:ec6951d3a1e685ba02727364e74302665fc0aa858a1c2d205f028b346fe0b630" ],
+    "trials" : [ {
+      "index" : 0,
+      "primitiveSolved" : false,
+      "primitiveWork" : 79,
+      "learnedSolved" : false,
+      "learnedWork" : 161,
+      "learnedSteps" : 0
+    }, {
+      "index" : 1,
+      "primitiveSolved" : false,
+      "primitiveWork" : 71,
+      "learnedSolved" : true,
+      "learnedWork" : 204,
+      "learnedSteps" : 1
+    }, {
+      "index" : 2,
+      "primitiveSolved" : false,
+      "primitiveWork" : 84,
+      "learnedSolved" : false,
+      "learnedWork" : 200,
+      "learnedSteps" : 0
+    }, {
+      "index" : 3,
+      "primitiveSolved" : false,
+      "primitiveWork" : 37,
+      "learnedSolved" : false,
+      "learnedWork" : 102,
+      "learnedSteps" : 0
+    }, {
+      "index" : 4,
+      "primitiveSolved" : true,
+      "primitiveWork" : 116,
+      "learnedSolved" : true,
+      "learnedWork" : 257,
+      "learnedSteps" : 1
+    }, {
+      "index" : 5,
+      "primitiveSolved" : true,
+      "primitiveWork" : 132,
+      "learnedSolved" : true,
+      "learnedWork" : 302,
+      "learnedSteps" : 1
+    }, {
+      "index" : 6,
+      "primitiveSolved" : true,
+      "primitiveWork" : 122,
+      "learnedSolved" : true,
+      "learnedWork" : 376,
+      "learnedSteps" : 0
+    }, {
+      "index" : 7,
+      "primitiveSolved" : true,
+      "primitiveWork" : 145,
+      "learnedSolved" : true,
+      "learnedWork" : 349,
+      "learnedSteps" : 0
+    }, {
+      "index" : 8,
+      "primitiveSolved" : false,
+      "primitiveWork" : 117,
+      "learnedSolved" : true,
+      "learnedWork" : 257,
+      "learnedSteps" : 1
+    }, {
+      "index" : 9,
+      "primitiveSolved" : false,
+      "primitiveWork" : 173,
+      "learnedSolved" : true,
+      "learnedWork" : 302,
+      "learnedSteps" : 1
+    }, {
+      "index" : 10,
+      "primitiveSolved" : false,
+      "primitiveWork" : 107,
+      "learnedSolved" : false,
+      "learnedWork" : 283,
+      "learnedSteps" : 0
+    }, {
+      "index" : 11,
+      "primitiveSolved" : false,
+      "primitiveWork" : 121,
+      "learnedSolved" : false,
+      "learnedWork" : 242,
+      "learnedSteps" : 0
+    }, {
+      "index" : 12,
+      "primitiveSolved" : true,
+      "primitiveWork" : 314,
+      "learnedSolved" : true,
+      "learnedWork" : 280,
+      "learnedSteps" : 1
+    }, {
+      "index" : 13,
+      "primitiveSolved" : false,
+      "primitiveWork" : 276,
+      "learnedSolved" : false,
+      "learnedWork" : 306,
+      "learnedSteps" : 0
+    }, {
+      "index" : 14,
+      "primitiveSolved" : true,
+      "primitiveWork" : 576,
+      "learnedSolved" : true,
+      "learnedWork" : 464,
+      "learnedSteps" : 1
+    }, {
+      "index" : 15,
+      "primitiveSolved" : true,
+      "primitiveWork" : 648,
+      "learnedSolved" : true,
+      "learnedWork" : 554,
+      "learnedSteps" : 1
+    }, {
+      "index" : 16,
+      "primitiveSolved" : true,
+      "primitiveWork" : 638,
+      "learnedSolved" : true,
+      "learnedWork" : 587,
+      "learnedSteps" : 2
+    }, {
+      "index" : 17,
+      "primitiveSolved" : true,
+      "primitiveWork" : 362,
+      "learnedSolved" : true,
+      "learnedWork" : 290,
+      "learnedSteps" : 1
+    }, {
+      "index" : 18,
+      "primitiveSolved" : true,
+      "primitiveWork" : 362,
+      "learnedSolved" : true,
+      "learnedWork" : 290,
+      "learnedSteps" : 1
+    }, {
+      "index" : 19,
+      "primitiveSolved" : true,
+      "primitiveWork" : 364,
+      "learnedSolved" : true,
+      "learnedWork" : 477,
+      "learnedSteps" : 2
+    }, {
+      "index" : 20,
+      "primitiveSolved" : true,
+      "primitiveWork" : 68,
+      "learnedSolved" : true,
+      "learnedWork" : 217,
+      "learnedSteps" : 0
+    }, {
+      "index" : 21,
+      "primitiveSolved" : true,
+      "primitiveWork" : 536,
+      "learnedSolved" : true,
+      "learnedWork" : 678,
+      "learnedSteps" : 2
+    }, {
+      "index" : 22,
+      "primitiveSolved" : true,
+      "primitiveWork" : 72,
+      "learnedSolved" : true,
+      "learnedWork" : 242,
+      "learnedSteps" : 0
+    }, {
+      "index" : 23,
+      "primitiveSolved" : true,
+      "primitiveWork" : 562,
+      "learnedSolved" : true,
+      "learnedWork" : 754,
+      "learnedSteps" : 2
+    } ]
+  }
+}

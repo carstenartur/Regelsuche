@@ -437,7 +437,7 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - **Hypothese.** Frühere und neu erworbene, separat geprüfte Schemata ergänzen sich. Eine auf gemessene Kosten und Erfolge trainierte Auswahl könnte zu teure Regelversuche vermeiden.
 - **Umsetzungsstand.** Unabhängig geprüfte Bibliotheken lassen sich zusammenführen. Der Versuch nutzt zusätzlich primitive Beweise früherer Aufgaben als Unterricht. Er erfasst erfolglose Versuche, den Erwerb und jede Entscheidung zwischen Lernregeln und primitiver Suche. [Vorab festgelegte Familien und Kontrollen](prospective-retained-tactics/protocol.md)
 
-- [`CostAwareTacticRouter.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/CostAwareTacticRouter.java#L25) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/CostAwareTacticRouter.java | public final class CostAwareTacticRouter { -->
+- [`CostAwareTacticRouter.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/CostAwareTacticRouter.java#L27) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/CostAwareTacticRouter.java | public final class CostAwareTacticRouter { -->
 - [`CheckedLearnedSchemaModel.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedLearnedSchemaModel.java#L409) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedLearnedSchemaModel.java | public Retention retainWith(CheckedLearnedSchemaModel additional) { -->
 - [`RetainedTacticStudyTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/RetainedTacticStudyTest.java#L31) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/RetainedTacticStudyTest.java | class RetainedTacticStudyTest { -->
 
