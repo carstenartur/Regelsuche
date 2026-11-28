@@ -69,13 +69,13 @@ class CheckedMathExamplesTest {
     @Test void executesSpectralRepairAndKeepsTheCheaperBaseline() {
         assertEquals(List.of("repair supports: [[0], [1], [2]]; forward rows=2; inverse rows=2",
                 "repair output: [[3, 4, 3], [-8, -2, 1], [-1, -6, -3]]",
-                "batch operations: repair=162, direct=21; selected=DIRECT"),
+                "batch operations: repair=158, direct=18; selected=DIRECT"),
             output(() -> SpectralRepair.main(new String[0])).lines().toList());
     }
 
     @Test void executesTheOptimizedComposedStages() {
         assertEquals(List.of("centered product: [49/4, 25/4, 9/4, 1/4, 1/4, 9/4, 25/4, 49/4]",
-                "operations per pair: direct=248, composed=54; replay=true", "searched stages: [U, V, W]"),
+                "operations per pair: direct=152, composed=40; replay=true", "searched stages: [U, V, W]"),
             output(() -> ComposedBilinearPlans.main(new String[0])).lines().toList());
     }
 

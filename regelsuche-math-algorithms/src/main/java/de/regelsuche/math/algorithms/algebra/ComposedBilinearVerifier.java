@@ -37,9 +37,9 @@ public final class ComposedBilinearVerifier {
         checks.retain(checks.requestCells(request) + checks.programCells(plan.program()) + 8);
         for (var stage : plan.stages()) checks.retain(checks.stageCells(stage));
         request.checkInputs(checks.work);
-        var direct = BilinearProgramVerifier.check(request, plan.program(), checks.retained, checks.work);
-        var directCost = ComposedBilinearChecks.scale(direct, batchWidth);
+        BilinearProgramVerifier.check(request, plan.program(), checks.retained, checks.work);
         var cost = new ComposedBilinearPlan.Cost((long) rank * batchWidth, 0, 0);
+        var directCost = cost;
         var executors = new ArrayList<ComposedBilinearPrepared.ExecutableStage>(plan.stages().size());
         if (rank != 0) {
             var matrices = List.of(plan.program().u(), plan.program().v(), plan.program().w());
@@ -50,9 +50,10 @@ public final class ComposedBilinearVerifier {
                 if (stage instanceof ComposedBilinearPlan.Linear linear) {
                     var compiled = checks.require(checks.child(limits -> OperatorResidualSearch.prepare(expected,
                         linear.plan(), limits, checks.cancelled)));
-                    // The compiler retains sparse (column, coefficient) entries and its source tree.
+                    // The compiler retains row registers, common scalings and the source tree.
                     checks.retain(8L * checks.linearCells(linear.plan()));
                     executable = new ComposedBilinearPrepared.LinearStage(compiled);
+                    directCost = directCost.plus(ComposedBilinearChecks.scale(compiled.directCost(), batchWidth));
                 } else {
                     var spectral = (ComposedBilinearPlan.Spectral) stage;
                     need(spectral.problem().batchWidth() == batchWidth, "BATCH_WIDTH_MISMATCH");
@@ -65,6 +66,7 @@ public final class ComposedBilinearVerifier {
                         spectral.certificate(), limits, checks.cancelled)));
                     checks.retain(compiled.retainedCells());
                     executable = new ComposedBilinearPrepared.SpectralStage(compiled);
+                    directCost = directCost.plus(compiled.directCost());
                 }
                 cost = cost.plus(executable.batchCost(batchWidth));
                 executors.add(executable);

@@ -65,7 +65,11 @@ final class OperatorChecks {
 
     void reserve(int rows, int cols) {
         dimensions(rows, cols);
-        materialized += (long) rows * cols;
+        reserveCells((long) rows * cols);
+    }
+
+    void reserveCells(long cells) {
+        materialized += cells;
         work.cells(materialized);
     }
 
