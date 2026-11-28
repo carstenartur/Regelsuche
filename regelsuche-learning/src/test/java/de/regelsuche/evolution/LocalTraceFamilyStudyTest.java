@@ -31,6 +31,22 @@ class LocalTraceFamilyStudyTest {
     }
 
     @Test
+    void selectionReplayRejectsAChangedHistoricalFreeze(@TempDir Path dir) throws Exception {
+        java.nio.file.Files.writeString(dir.resolve("freeze.json"), "{}");
+        var output = dir.resolve("result.json");
+        assertThrows(IllegalArgumentException.class, () -> LocalTraceFamilyStudy.main(
+            new String[]{"selection", dir.toString(), "0", output.toString()}));
+        assertFalse(java.nio.file.Files.exists(output));
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "localTrace.phase", matches = "selection")
+    void replaySelectionAgainstTheFixedModel() throws Exception {
+        LocalTraceFamilyStudy.main(new String[]{"selection", System.getProperty("localTrace.directory"),
+            System.getProperty("localTrace.rotation"), System.getProperty("localTrace.output")});
+    }
+
+    @Test
     @EnabledIfSystemProperty(named = "localTrace.phase", matches = "train|final")
     void runFrozenPublicStudy() throws Exception {
         String directory = System.getProperty("localTrace.directory");

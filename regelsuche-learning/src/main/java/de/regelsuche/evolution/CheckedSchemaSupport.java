@@ -189,11 +189,25 @@ final class CheckedSchemaSupport {
     }
     /** Total rational polynomial syntax: no functions, variable denominators or variable/negative powers. */
     static void domain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
-        domain(root, bounds, work, false);
+        countedDomain(root, bounds, work);
     }
 
     /** For the shared surface, a separate exact guard checks constant denominator expressions. */
     static void domain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work, boolean checkSharedSurface) {
+        countedDomain(root, bounds, work, checkSharedSurface);
+    }
+
+    static int countedDomain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
+        return countedDomain(root, bounds, work, false);
+    }
+
+    private static int countedDomain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work, boolean checkSharedSurface) {
+        return countedDomain(root, bounds, work, checkSharedSurface, null);
+    }
+
+    /** Optional whole-task operator proof shares the exact scalar-domain and node-count traversal. */
+    static int countedDomain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work, boolean checkSharedSurface,
+            PrimitiveSchemaReachability.OperatorScan scan) {
         var pending = new ArrayDeque<Node>();
         pending.push(new Node(root, 0));
         var current = new Node[1];
@@ -201,15 +215,16 @@ final class CheckedSchemaSupport {
         // Queue/backing, root wrapper/insertion and actual current/rejection slots.
         var retained=RetainedOperation.retainCompleted(8,root,bounds,work,pending,current,rejection);
         Throwable primary=null;
+        int count = 0;
+        int maximumNodes = scan == null ? bounds.maximumExpressionNodes() : scan.maximumNodes;
         try {
             try {
-                int count = 0;
                 while (!pending.isEmpty()) {
                     var node = current[0] = pending.pop();
                     // The caller owns this visited-work ledger, including a failed prefix.
                     work.add(1);
                     RetainedOperation.work(2);
-                    if (++count > bounds.maximumExpressionNodes() || node.depth() > bounds.maximumDepth()) {
+                    if (++count > maximumNodes || node.depth() > bounds.maximumDepth()) {
                         throw new DomainRejected("checked scalar polynomial structure limit");
                     }
                     switch (node.value()) {
@@ -218,6 +233,7 @@ final class CheckedSchemaSupport {
                             if (variable.name().length() > 128) throw new DomainRejected("checked symbol size limit");
                         }
                         case BinaryExpr binary -> {
+                            if (scan != null) scan.observe(binary.operator(), work);
                             if (!checkSharedSurface || binary.operator() != BinaryOperator.DIV) binaryDomain(binary,bounds);
                             pending.push(new Node(binary.right(), node.depth() + 1));
                             RetainedOperation.work(2);
@@ -252,6 +268,7 @@ final class CheckedSchemaSupport {
             }
         }
         if(rejection[0]!=null)throw new DomainRejected(rejection[0]);
+        return count;
     }
 
     private static void binaryDomain(BinaryExpr binary, CheckedLearnedSchemaModel.Bounds bounds) {

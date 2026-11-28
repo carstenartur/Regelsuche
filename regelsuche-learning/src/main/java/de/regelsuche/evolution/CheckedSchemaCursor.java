@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /** One retained match/application at most; never traverses or instantiates later sites eagerly. */
-final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View {
+class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View {
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(plan);v.reference(encodedSource);v.reference(meter);v.reference(pending);v.reference(source);v.reference(occurrence);v.reference(relevant);v.reference(matchedEntry);v.reference(bindings);v.reference(application);v.reference(applicationWork);v.reference(initializationWork);v.reference(payment);v.reference(ready);v.reference(result);v.reference(mathematics);v.reference(status);}
     private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();
     private record Occurrence(Expr expression, List<Integer> path)  implements RetainedGraph.View {
@@ -59,8 +59,12 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
         this.result=result;this.mathematics=mathematics;complete=plan.allSchemasIncluded();
     }
     static Source legacy(CheckedSchemaMatcherPlan plan,String encodedSource,Meter meter) {
-        var cursor=new CheckedSchemaCursor<>(plan,encodedSource,null,meter,
-            CheckedSchemaMatcherPlan.ApplicationSteps::result,Transformation::executionWork);
+        return legacy(plan, encodedSource, meter, null);
+    }
+    static Source legacy(CheckedSchemaMatcherPlan plan,String encodedSource,Meter meter, CheckedDomainSizeReceipts receipts) {
+        var cursor=receipts == null ? new CheckedSchemaCursor<>(plan,encodedSource,null,meter,
+            CheckedSchemaMatcherPlan.ApplicationSteps::result,Transformation::executionWork)
+            : new SelectedCursor(plan, encodedSource, meter, receipts);
         return new Source() {
             @Override public Optional<Transformation> next(long allowance){return cursor.next(allowance);}
             @Override public Status status(){return cursor.status();}
@@ -134,8 +138,13 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
             try {
                 try {
                     if(loadSource()) {
-                        domain(source,plan.bounds(),initializationWork);
-                        pending.push(new Occurrence(source,plan.indexedDispatch() ? SharedOccurrencePath.root() : List.of()));
+                        int nodes = inspect(source,plan.bounds(),initializationWork);
+                        if (plan.selectsSites()) {
+                            if (nodes < plan.minimumNodes()) finishSelection();
+                            else enqueue(source, 0, 0, nodes, initializationWork);
+                        } else {
+                            pending.push(new Occurrence(source,plan.indexedDispatch() ? SharedOccurrencePath.root() : List.of()));
+                        }
                     } else {complete=false;status=Status.INCONCLUSIVE;}
                 } catch(AstExpressionValidation.InvalidExpression | DomainRejected unsupported) {
                     complete=false;status=Status.INCONCLUSIVE;
@@ -154,6 +163,30 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
             }
         }
     }
+    int inspect(Expr expression, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
+        return countedDomain(expression, bounds, work);
+    }
+    void rememberTarget(CheckedSchemaMatcherPlan.ApplicationSteps completed, Meter meter) {}
+
+    private static final class SelectedCursor extends CheckedSchemaCursor<Transformation> {
+        private final CheckedDomainSizeReceipts receipts;
+        SelectedCursor(CheckedSchemaMatcherPlan plan, String encodedSource, Meter meter, CheckedDomainSizeReceipts receipts) {
+            super(plan, encodedSource, null, meter, CheckedSchemaMatcherPlan.ApplicationSteps::result, Transformation::executionWork);
+            this.receipts = receipts;
+        }
+        @Override int inspect(Expr expression, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
+            Integer size = receipts.size(expression, work);
+            return size == null ? super.inspect(expression, bounds, work) : size;
+        }
+        @Override void rememberTarget(CheckedSchemaMatcherPlan.ApplicationSteps completed, Meter meter) {
+            var work = new Work();
+            completed.rememberTarget(receipts, work);
+            meter.charge(Operation.MATCH, work.units);
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+            super.retainedReferences(visitor); visitor.reference(receipts);
+        }
+    }
     private boolean loadSource() {
         if(encodedSource!=null) {
             // Historical codec boundary; native calls do not enter or generalize this catch.
@@ -166,6 +199,56 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
             throw new AstExpressionValidation.InvalidExpression("schema source transport size limit");
         return true;
     }
+    /** Path bits are valid through the checked model's maximum supported depth of 64. */
+    private static final class SelectedPath extends java.util.AbstractList<Integer> implements RetainedGraph.View {
+        private final int depth;
+        private final long edges;
+        private final int nodeBound;
+        SelectedPath(int depth, long edges, int nodeBound) { this.depth = depth; this.edges = edges; this.nodeBound = nodeBound; }
+        @Override public int size() { return depth; }
+        @Override public Integer get(int index) {
+            java.util.Objects.checkIndex(index, depth);
+            return (int) ((edges >>> index) & 1);
+        }
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {}
+    }
+
+    private void enqueue(Expr expression, int depth, long edges, int nodeBound, Work work) {
+        work.add(1);
+        if (nodeBound >= plan.minimumNodes() && (expression instanceof BinaryExpr || plan.selectsLeaves())) {
+            pending.push(new Occurrence(expression, new SelectedPath(depth, edges, nodeBound)));
+            work.add(2); // Packed location and queue insertion.
+        }
+    }
+
+    private void advanceSelected() {
+        // Locations whose root shapes are impossible never open an exact matcher.
+        var expression = occurrence.expression();
+        var work = new Work();
+        relevant = plan.selectedRange(expression, work);
+        if (relevant != null) {
+            if (relevant.size() > plan.maximumSchemasPerOccurrence()) complete = false;
+            remainingSchemas = plan.selectedMask(expression, work);
+            schemaIndex = Long.numberOfTrailingZeros(remainingSchemas);
+        }
+        if (relevant == null || remainingSchemas == 0) {
+            queueSelectedChildren(work);
+            occurrence = null;
+        }
+        meter.charge(Operation.MATCH, work.units);
+    }
+    private void queueSelectedChildren(Work work) {
+        var path = (SelectedPath) occurrence.path();
+        if (occurrence.expression() instanceof BinaryExpr binary && path.nodeBound >= plan.minimumNodes() + 2) {
+            int rightBound = path.nodeBound - (binary.left() instanceof BinaryExpr ? 4 : 2);
+            int leftBound = path.nodeBound - (binary.right() instanceof BinaryExpr ? 4 : 2);
+            enqueue(binary.right(), path.depth + 1, path.edges | (1L << path.depth), rightBound, work);
+            enqueue(binary.left(), path.depth + 1, path.edges, leftBound, work);
+        }
+        if (pending.isEmpty()) finishSelection();
+    }
+    private void finishSelection() { status = complete ? Status.EXHAUSTED : Status.INCONCLUSIVE; }
+
     private void advance() {
         meter.charge(Operation.MATCH, 1);
         if (pending.isEmpty()) {
@@ -173,6 +256,10 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
             return;
         }
         occurrence = pending.pop();
+        if (plan.selectsSites()) {
+            advanceSelected();
+            return;
+        }
         relevant = plan.relevant(occurrence.expression());
         schemaIndex = 0;
         if (plan.indexedDispatch()) {
@@ -190,7 +277,7 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
         }
         attempted++;
         var entry = relevant.get(schemaIndex++);
-        if (plan.indexedDispatch()) {
+        if (plan.indexedDispatch() || plan.selectsSites()) {
             remainingSchemas &= remainingSchemas - 1;
             schemaIndex = Long.numberOfTrailingZeros(remainingSchemas);
         }
@@ -208,7 +295,9 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
         if (application == null) {
             applicationWork = new Work();
             payment = meter.beginPrepaidApplication();
-            if (occurrence.path() instanceof SharedOccurrencePath shared) startSharedApplication(shared);
+            if (occurrence.path() instanceof SelectedPath selected) {
+                startSelectedApplication(selected);
+            } else if (occurrence.path() instanceof SharedOccurrencePath shared) startSharedApplication(shared);
             else application = plan.startApplication(matchedEntry, source, encodedSource, occurrence.path(), bindings, applicationWork);
         }
         long before = applicationWork.units;
@@ -233,22 +322,37 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
         else if (application.done()) {
             ready = result.apply(application);
             if (ready == null) meter.abandon(payment);
-            else { meter.complete(payment, mathematics.apply(ready)); produced++; }
+            else { meter.complete(payment, mathematics.apply(ready)); rememberTarget(application, meter); produced++; }
         } else return;
         de.regelsuche.retention.RetainedOperation.work(1);
         de.regelsuche.retention.RetainedOperation.checkpoint();
         clearApplication();
     }
+    private void startSelectedApplication(SelectedPath path) {
+        if (path.size() > 2 || RetainedOperation.isObserved()) {
+            startSharedApplication(path);
+            return;
+        }
+        // The small immutable JDK lists store zero, one or two edges directly.
+        List<Integer> edges = switch (path.size()) {
+            case 0 -> List.of();
+            case 1 -> List.of(path.get(0));
+            default -> List.of(path.get(0), path.get(1));
+        };
+        meter.charge(Operation.MATCH, path.size() + 1L);
+        application = plan.startApplication(matchedEntry, source, encodedSource, edges, bindings, applicationWork);
+    }
+
     private static final class PathProjection implements RetainedGraph.View {
-        private final SharedOccurrencePath source;
+        private final List<Integer> source;
         private Integer[] buffer;
         private List<Integer> path;
-        PathProjection(SharedOccurrencePath source) { this.source = source; }
+        PathProjection(List<Integer> source) { this.source = source; }
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
             visitor.reference(source); visitor.reference(buffer); visitor.reference(path);
         }
     }
-    private void startSharedApplication(SharedOccurrencePath path) {
+    private void startSharedApplication(List<Integer> path) {
         var projection = new PathProjection(path);
         var held = RetainedOperation.retainCompleted(1, this, projection);
         Throwable primary = null;
@@ -256,7 +360,8 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
             projection.buffer = new Integer[path.size()];
             meter.charge(Operation.MATCH, path.size() + 1L);
             RetainedOperation.checkpoint();
-            path.copyInto(projection.buffer);
+            if (path instanceof SharedOccurrencePath shared) shared.copyInto(projection.buffer);
+            else for (int i = 0; i < path.size(); i++) projection.buffer[i] = path.get(i);
             meter.charge(Operation.MATCH, path.size() + 1L);
             RetainedOperation.checkpoint();
             projection.path = List.of(projection.buffer);
@@ -281,7 +386,11 @@ final class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View
     }
     private void descend() {
         meter.charge(Operation.MATCH, 1);
-        if (occurrence.expression() instanceof BinaryExpr binary) {
+        if (plan.selectsSites()) {
+            var work = new Work();
+            queueSelectedChildren(work);
+            meter.charge(Operation.MATCH, work.units);
+        } else if (occurrence.expression() instanceof BinaryExpr binary) {
             pending.push(new Occurrence(binary.right(), child(occurrence.path(), 1)));
             pending.push(new Occurrence(binary.left(), child(occurrence.path(), 0)));
             meter.charge(Operation.MATCH, occurrence.path() instanceof SharedOccurrencePath ? 2L : 2L * (occurrence.path().size() + 1));

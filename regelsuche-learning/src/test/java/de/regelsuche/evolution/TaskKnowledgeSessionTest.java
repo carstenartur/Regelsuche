@@ -43,6 +43,40 @@ class TaskKnowledgeSessionTest {
         assertTrue(CumulativeTaskKnowledge.emptyPrepared(inventory, TaskConstructionProfile.NONE).usesIndexedPreparation());
     }
 
+    @Test void occurrenceSelectionSurvivesLearningAndReopensHistoricalSnapshots(@TempDir Path directory) throws Exception {
+        var inventory = TraceStrategyTransferExample.inventory();
+        var mode = CumulativeTaskKnowledge.MatcherPreparation.OCCURRENCE_SELECTION;
+        var start = CumulativeTaskKnowledge.empty(inventory, TaskConstructionProfile.NONE, mode);
+        var gate = task("((3*c+0)*1)", 3);
+        var restricted = new CheckedSchemaTaskSolver.Task(gate.source(), gate.assumptions(), gate.goal(),
+            new MoveSearch.Budget(16, 1, 200_000, 256, 200_000));
+        var update = start.learnLocalBatch(List.of(task("((x+0)*1)+(a+0)", 3), task("((y+0)*1)-(b+0)", 3)),
+            List.of(restricted), CumulativeTaskKnowledge.DEFAULT_LEARNING_WORK);
+        assertTrue(update.promoted(), update.reason()::toString);
+        assertEquals(mode, update.next().matcherPreparation());
+        var path = learned.save(directory);
+        var restored = CumulativeTaskKnowledge.load(inventory, path, mode);
+        assertEquals(learned.id(), restored.id());
+        assertTrue(restored.sessionSetupWork() > 0);
+        var query = task(CumulativeTaskKnowledgeContract.nested("r+s", 3, "t"), 9);
+        var answer = restored.solve(query, CumulativeTaskKnowledge.Strategy.KNOWLEDGE_FIRST);
+        assertTrue(answer.solved());
+        assertTrue(answer.solution().orElseThrow().learnedApplications() > 0);
+        assertTrue(answer.solution().orElseThrow().evidence().replayWork() > 0);
+        var routed = CumulativeTaskKnowledge.restore(inventory, learned.toCanonicalJson(),
+            CumulativeTaskKnowledge.MatcherPreparation.OCCURRENCE_SELECTION_WITH_ROUTING);
+        assertEquals(restored.id(), routed.id());
+        var routedAnswer = routed.solve(query, CumulativeTaskKnowledge.Strategy.KNOWLEDGE_FIRST);
+        assertTrue(routedAnswer.solved());
+        assertEquals(answer.solution().orElseThrow().learnedApplications(),
+            routedAnswer.solution().orElseThrow().learnedApplications());
+        try (var session = new TaskKnowledgeSession(inventory, 2, 1_000_000, mode)) {
+            assertSame(restored, session.retainVerified(restored).knowledge());
+            assertTrue(session.prepare(path).reused());
+            assertThrows(IllegalArgumentException.class, () -> session.retainVerified(learned));
+        }
+    }
+
     @Test void repeatedLoadsReuseOnlyVerifiedCanonicalKnowledge(@TempDir Path directory) throws Exception {
         Path path = learned.save(directory);
         try (var session = new TaskKnowledgeSession(TraceStrategyTransferExample.inventory(), 2, 1_000_000)) {

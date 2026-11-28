@@ -728,6 +728,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         private final Work work;
         private ApplicationPhase phase;
         private Expr target;
+        private int targetNodes;
         private VerifiedApplication verified;
         private boolean done;
 
@@ -748,6 +749,9 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         }
         @Override public ApplicationPhase phase() { return phase; }
         @Override public boolean done() { return done; }
+        @Override public void rememberTarget(CheckedDomainSizeReceipts receipts, Work measured) {
+            if (verified != null) receipts.remember(target, targetNodes, measured);
+        }
         @Override public void advance() {
             if (done) throw new IllegalStateException("checked application already complete");
             switch (phase) {
@@ -762,7 +766,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                     phase = ApplicationPhase.TARGET_DOMAIN;
                 }
                 case TARGET_DOMAIN -> {
-                    domain(target, bounds, work);
+                    targetNodes = countedDomain(target, bounds, work);
                     if (source.equals(target)) done = true;
                     else phase = ApplicationPhase.EVIDENCE;
                 }

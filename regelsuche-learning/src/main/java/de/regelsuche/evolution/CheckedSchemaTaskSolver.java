@@ -107,6 +107,9 @@ public final class CheckedSchemaTaskSolver {
 
     private final TypedLearnedMoveInventory.SearchSession session;
     private final CheckedSchemaMatcherPlan.Compilation preparation;
+    private final CheckedSchemaMatcherPlan selectedPlan;
+    private final PrimitiveSchemaReachability primitiveRoute;
+    private final CheckedSchemaTaskSolver primitiveFallback;
     private final boolean breadthFirstPriority;
     private final boolean exactPolynomialSteps;
     private final boolean expansionRulesAttached;
@@ -114,19 +117,48 @@ public final class CheckedSchemaTaskSolver {
 
     CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
             CheckedSchemaMatcherPlan.Compilation preparation) {
-        this(session, preparation, false, false, false, false);
+        this(session, preparation, null);
+    }
+
+    CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session, CheckedSchemaMatcherPlan.Compilation preparation,
+            CheckedSchemaMatcherPlan selectedPlan) {
+        this(session, preparation, false, false, false, false, selectedPlan);
     }
 
     private CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
             CheckedSchemaMatcherPlan.Compilation preparation, boolean breadthFirstPriority, boolean exactPolynomialSteps,
             boolean expansionRulesAttached,
-            boolean expansionBridgesForOtherGoals) {
+            boolean expansionBridgesForOtherGoals, CheckedSchemaMatcherPlan selectedPlan) {
+        this(session, preparation, breadthFirstPriority, exactPolynomialSteps, expansionRulesAttached,
+            expansionBridgesForOtherGoals, selectedPlan, null, null);
+    }
+
+    private CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
+            CheckedSchemaMatcherPlan.Compilation preparation, boolean breadthFirstPriority, boolean exactPolynomialSteps,
+            boolean expansionRulesAttached, boolean expansionBridgesForOtherGoals, CheckedSchemaMatcherPlan selectedPlan,
+            PrimitiveSchemaReachability primitiveRoute, CheckedSchemaTaskSolver primitiveFallback) {
+        this.primitiveRoute = primitiveRoute;
+        this.primitiveFallback = primitiveFallback;
         this.session = Objects.requireNonNull(session, "session");
         this.preparation = preparation;
+        this.selectedPlan = selectedPlan;
         this.breadthFirstPriority = breadthFirstPriority;
         this.exactPolynomialSteps = exactPolynomialSteps;
         this.expansionRulesAttached = expansionRulesAttached;
         this.expansionBridgesForOtherGoals = expansionBridgesForOtherGoals;
+    }
+
+    CheckedSchemaTaskSolver withPrimitiveRoute(List<MoveProvider> primitives, PrimitiveSchemaReachability route) {
+        var guarded = new java.util.ArrayList<>(primitives);
+        guarded.set(0, route.withDomainCheck(guarded.getFirst()));
+        var fallback = new CheckedSchemaTaskSolver(new TypedLearnedMoveInventory.SearchSession(guarded, List.of(), session.verifier()), null);
+        var receipt = preparation;
+        var revision = receipt.revision() + "+" + PrimitiveSchemaReachability.REVISION;
+        var identity = receipt.configurationHash() + ";" + PrimitiveSchemaReachability.REVISION;
+        var routed = new CheckedSchemaMatcherPlan.Compilation(revision, SchematicProofPlan.hash(identity),
+            Math.addExact(receipt.workUnits(), route.compilationWork() + identity.length()),
+            receipt.includedSchemas(), receipt.patternNodeVisits() + route.patternVisits(), receipt.orderingComparisons());
+        return new CheckedSchemaTaskSolver(session, routed, false, false, false, false, selectedPlan, route, fallback);
     }
 
     CheckedSchemaTaskSolver withConstructions(List<StructuralConstructionPrograms.Operation> operations,
@@ -141,12 +173,12 @@ public final class CheckedSchemaTaskSolver {
         var augmented = new TypedLearnedMoveInventory.SearchSession(providers, session.primitiveCaches(),
             (source, move, context) -> verifiers.getOrDefault(move.ruleId(), session.verifier()).verify(source, move, context));
         return new CheckedSchemaTaskSolver(augmented, preparation, prioritizeBreadth, exactPolynomialSteps,
-            expansionRulesAttached, expansionBridgesForOtherGoals);
+            expansionRulesAttached, expansionBridgesForOtherGoals, selectedPlan);
     }
 
     CheckedSchemaTaskSolver withExactPolynomialSteps() {
         return new CheckedSchemaTaskSolver(session, preparation, breadthFirstPriority, true,
-            expansionRulesAttached, expansionBridgesForOtherGoals);
+            expansionRulesAttached, expansionBridgesForOtherGoals, selectedPlan);
     }
 
     CheckedSchemaTaskSolver withDirectPolynomial(boolean sharedArithmetic) {
@@ -160,12 +192,12 @@ public final class CheckedSchemaTaskSolver {
 
     private CheckedSchemaTaskSolver withOnlyPolynomialProvider(StructuralConstructionProvider provider) {
         var standalone = new TypedLearnedMoveInventory.SearchSession(List.of(provider), session.primitiveCaches(), provider.verifier());
-        return new CheckedSchemaTaskSolver(standalone, preparation, false, true, false, false);
+        return new CheckedSchemaTaskSolver(standalone, preparation, false, true, false, false, null);
     }
 
     CheckedSchemaTaskSolver withExpansionRules(boolean bridgesForOtherGoals) {
         return new CheckedSchemaTaskSolver(StructuralExpansionRules.attach(session, preparation != null), preparation,
-            breadthFirstPriority, exactPolynomialSteps, true, bridgesForOtherGoals);
+            breadthFirstPriority, exactPolynomialSteps, true, bridgesForOtherGoals, selectedPlan);
     }
 
     /** Paid once when this immutable solver is prepared; never silently multiplied or discarded. */
@@ -261,20 +293,51 @@ public final class CheckedSchemaTaskSolver {
 
     // The primitive control uses its cheaper batch scheduler; it is not handicapped by unused cursor machinery.
     TypedMoveSearch.Problem problem(Task task) {
+        if (primitiveRoute == null) return problem(task, null);
+        var decision = primitiveRoute.inspect(task.source(), task.budget().totalWork());
+        var solver = decision.primitiveOnly() ? primitiveFallback : this;
+        return solver.problem(task, decision);
+    }
+
+    private TypedMoveSearch.Problem problem(Task task, PrimitiveSchemaReachability.Decision decision) {
         var standalone = standalonePolynomial();
+        var receipts = selectedPlan == null ? null : new CheckedDomainSizeReceipts(selectedPlan.bounds());
+        long routingWork = bindRoot(task, decision, receipts);
+        var providers = providersFor(task, standalone);
+        // Bind one per-task receipt map to the selected cursor and substitute its provider.
+        // The state-value ledger pays once at root, including on already-satisfied tasks.
+        long querySetup = receipts == null ? 0 : providers.size() + 10L;
+        if (receipts != null) {
+            var replacement = selectedPlan.provider(receipts);
+            providers = providers.stream().map(provider -> provider.descriptor().id().equals(replacement.descriptor().id())
+                ? replacement : provider).toList();
+        }
         return new TypedMoveSearch.Problem(task.source(),
             TypedMoveSearch.Context.sourceOnly(task.assumptions(), MoveContext.Phase.FROZEN_EVALUATION),
-            providersFor(task, standalone), policyFor(task),
+            providers, policyFor(task),
             standalone.isEmpty()
                     && (exactPolynomialSteps || StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective()))
                 ? StructuralStepVerifier.checked(session.verifier()) : session.verifier(), state -> 0,
             MoveSearch.Mode.FAST, preparation == null || standalone.isPresent() ? MoveSearch.Scheduling.STAGED
                 : MoveSearch.Scheduling.STAGED_INCREMENTAL, task.budget(),
             (state, context) -> {
-                var size = NativeNodeCountObjective.INSTANCE.evaluate(state);
+                var size = decision != null && decision.nodes() > 0 && state.searchDepth() == 0
+                    ? new TypedSourceOnlySearch.Score(decision.nodes(), routingWork)
+                    : receipts == null ? NativeNodeCountObjective.INSTANCE.evaluate(state) : receipts.evaluate(state);
+                long work = decision != null && decision.nodes() == 0 && state.searchDepth() == 0
+                    ? Math.addExact(size.work(), routingWork) : size.work();
                 double priority = breadthFirstPriority ? -state.searchDepth() : -size.value();
-                return new StateValue.Assessment(Math.toIntExact(size.value()), priority, size.work(), 0, Map.of());
+                return new StateValue.Assessment(Math.toIntExact(size.value()), priority,
+                    state.searchDepth() == 0 ? Math.addExact(querySetup, work) : work, 0, Map.of());
             });
+    }
+
+    private static long bindRoot(Task task, PrimitiveSchemaReachability.Decision decision, CheckedDomainSizeReceipts receipts) {
+        if (decision == null) return 0;
+        if (receipts == null || decision.nodes() == 0) return decision.work();
+        var work = new CheckedSchemaSupport.Work();
+        receipts.remember(task.source(), decision.nodes(), work);
+        return Math.addExact(decision.work(), work.units);
     }
 
     private List<MoveProvider> providersFor(Task task, Optional<StructuralConstructionProvider> standalone) {

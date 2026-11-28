@@ -39,6 +39,7 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
     public static final String WORK_REVISION = "regelsuche.checked-schema-cursor-work/v2-prepaid-phases";
     public static final String INDEXED_REVISION = "regelsuche.checked-schema-matcher-plan/v2-indexed";
     public static final String INDEXED_WORK_REVISION = "regelsuche.checked-schema-cursor-work/v3-indexed-shared-paths";
+    public static final String SELECTED_WORK_REVISION = "regelsuche.checked-schema-cursor-work/v4-bounded-site-selection";
     private static final int OTHER_SHAPE = 3;
     private static final int BINARY_SHAPE_BASE = 4;
     private static final int SHAPE_COUNT = BINARY_SHAPE_BASE + BinaryOperator.values().length;
@@ -63,6 +64,7 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
         IncrementalProviderContract.ApplicationPhase phase();
         void advance();
         boolean done();
+        default void rememberTarget(CheckedDomainSizeReceipts receipts, Work work) {}
         Transformation result();
         NativeMoveProof nativeResult();
     }
@@ -117,42 +119,57 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
 
     /** Compile once, then share the immutable result across independent cursor sessions. */
     public CheckedSchemaMatcherPlan withIndexedDispatch() {
-        return indexedDispatch() ? this : new CheckedSchemaMatcherPlan(this);
+        return indexedDispatch() ? this : new CheckedSchemaMatcherPlan(this, false);
     }
 
-    private CheckedSchemaMatcherPlan(CheckedSchemaMatcherPlan original) {
+    public static CheckedSchemaMatcherPlan prepareSelected(CheckedLearnedSchemaModel model, int maximum,
+            Map<String, Double> utilities, Set<String> included) {
+        return new CheckedSchemaMatcherPlan(prepare(model, maximum, utilities, included), true);
+    }
+
+    private CheckedSchemaMatcherPlan(CheckedSchemaMatcherPlan original, boolean selectSites) {
         model = original.model;
         descriptor = original.descriptor;
         application = original.application;
         bounds = original.bounds;
         maximumSchemasPerOccurrence = original.maximumSchemasPerOccurrence;
         allSchemasIncluded = original.allSchemasIncluded;
-        var prepared = new TreeMap<String, List<Entry>>();
         long extraWork = 1;
         long patternVisits = 0;
-        for (var bucket : original.index.entrySet()) {
-            if (bucket.getKey().equals("P")) prepared.put(bucket.getKey(), bucket.getValue());
-            else {
-                var entries = new IndexedEntries(bucket.getValue());
-                prepared.put(bucket.getKey(), entries);
-                extraWork = Math.addExact(extraWork, entries.shapes.compilationWork());
-                // Each requirement array has three slots; root and at most two children are inspected.
-                extraWork = Math.addExact(extraWork, 7L * entries.size() + 1);
-                for (var entry : bucket.getValue()) {
-                    patternVisits = Math.addExact(patternVisits,
-                        entry.schema().source() instanceof PatternExpr.Operation ? 3 : 1);
+        if (selectSites) {
+            var work = new Work();
+            var visits = new Work();
+            index = new SiteSelector(original.index, maximumSchemasPerOccurrence, work, visits);
+            extraWork += work.units;
+            patternVisits = visits.units;
+        } else {
+            var prepared = new TreeMap<String, List<Entry>>();
+            for (var bucket : original.index.entrySet()) {
+                if (bucket.getKey().equals("P")) prepared.put(bucket.getKey(), bucket.getValue());
+                else {
+                    var entries = new IndexedEntries(bucket.getValue());
+                    prepared.put(bucket.getKey(), entries);
+                    extraWork = Math.addExact(extraWork, entries.shapes.compilationWork());
+                    // Each requirement array has three slots; root and at most two children are inspected.
+                    extraWork = Math.addExact(extraWork, 7L * entries.size() + 1);
+                    for (var entry : bucket.getValue()) {
+                        patternVisits = Math.addExact(patternVisits,
+                            entry.schema().source() instanceof PatternExpr.Operation ? 3 : 1);
+                    }
                 }
+                extraWork = Math.addExact(extraWork, 2);
             }
-            extraWork = Math.addExact(extraWork, 2);
+            index = Map.copyOf(prepared);
         }
-        index = Map.copyOf(prepared);
-        String configuration = original.compilation.configurationHash() + ";" + INDEXED_REVISION + ";" + INDEXED_WORK_REVISION;
+        String revision = selectSites ? SELECTED_WORK_REVISION : INDEXED_WORK_REVISION;
+        String suffix = selectSites ? revision : INDEXED_REVISION + ";" + revision;
+        String configuration = original.compilation.configurationHash() + ";" + suffix;
         String configurationHash = SchematicProofPlan.hash(configuration);
-        extraWork = Math.addExact(extraWork, configuration.length() + prepared.size() + 1L);
+        extraWork = Math.addExact(extraWork, configuration.length() + index.size() + 1L);
         definition = new Definition(IncrementalProviderContract.PREPAID_REVISION, descriptor.id(), Kind.REGISTERED_SCHEMA,
-            configurationHash, original.definition.semanticsRevision() + ";" + INDEXED_REVISION + ";" + INDEXED_WORK_REVISION,
+            configurationHash, original.definition.semanticsRevision() + ";" + suffix,
             Transport.TYPED_AST_JSON, Mathematics.EXACT, null);
-        compilation = new Compilation(INDEXED_WORK_REVISION, configurationHash,
+        compilation = new Compilation(revision, configurationHash,
             Math.addExact(original.compilationWork(), extraWork), original.compilation.includedSchemas(),
             Math.addExact(original.compilation.patternNodeVisits(), patternVisits), original.compilation.orderingComparisons());
     }
@@ -194,6 +211,82 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
         return CheckedSchemaShapeIndex.ANY;
     }
 
+    boolean selectsSites() { return index instanceof SiteSelector; }
+
+    private SiteSelector selector() { return (SiteSelector) index; }
+
+    int minimumNodes() { return selector().minimumNodes; }
+
+    boolean selectsLeaves() { return selector().leafMask != 0; }
+
+    Range selectedRange(Expr expression, Work work) {
+        work.add(1);
+        return selector().ranges[shape(expression)];
+    }
+
+    long selectedMask(Expr expression, Work work) {
+        if (!(expression instanceof BinaryExpr binary)) return selector().leafMask;
+        work.add(3); // Two child shapes and one table lookup.
+        return selector().childMasks[shape(binary)][shape(binary.left()) * SHAPE_COUNT + shape(binary.right())];
+    }
+
+    /** Each bit is an original bucket position, including its wildcard suffix and selection cap. */
+    private static final class SiteSelector extends java.util.AbstractMap<String, List<CheckedSchemaMatcherPlan.Entry>> implements RetainedGraph.View {
+        private final Map<String, List<CheckedSchemaMatcherPlan.Entry>> buckets;
+        final Range[] ranges = new Range[SHAPE_COUNT];
+        final long[][] childMasks = new long[SHAPE_COUNT][];
+        final long leafMask;
+        final int minimumNodes;
+        SiteSelector(Map<String, List<CheckedSchemaMatcherPlan.Entry>> index, int cap, Work work, Work visits) {
+            buckets = index;
+            var wildcards = index.getOrDefault("P", List.of());
+            var leaves = new Range(index.getOrDefault("LEAF", List.of()), wildcards);
+            leafMask = CheckedSchemaShapeIndex.prefix(Math.min(cap, leaves.size()));
+            int minimum = leaves.size() > 0 ? 1 : Integer.MAX_VALUE - 2;
+            if (leaves.size() > 0) java.util.Arrays.fill(ranges, 0, BINARY_SHAPE_BASE, leaves);
+            work.add(2L * SHAPE_COUNT + BINARY_SHAPE_BASE + 3);
+            for (var operator : BinaryOperator.values()) {
+                int root = BINARY_SHAPE_BASE + operator.ordinal();
+                var bucket = new Range(index.getOrDefault(operator.name(), List.of()), wildcards);
+                work.add(2);
+                if (bucket.size() == 0) continue;
+                ranges[root] = bucket;
+                if (bucket.size() > cap) minimum = 1; // Preserve observed incomplete prefixes.
+                var masks = childMasks[root] = new long[SHAPE_COUNT * SHAPE_COUNT];
+                work.add(masks.length);
+                for (int row = 0; row < Math.min(cap, bucket.size()); row++) {
+                    var pattern = bucket.get(row).schema().source();
+                    int size = nodes(pattern);
+                    minimum = Math.min(minimum, size);
+                    work.add(size); visits.add(size);
+                    int left = CheckedSchemaShapeIndex.ANY, right = CheckedSchemaShapeIndex.ANY;
+                    if (pattern instanceof PatternExpr.Operation operation) {
+                        left = shape(operation.left()); right = shape(operation.right());
+                        visits.add(2); work.add(2);
+                    }
+                    visits.add(1); work.add(1);
+                    for (int l = 0; l < SHAPE_COUNT; l++) {
+                        work.add(1);
+                        if (left != CheckedSchemaShapeIndex.ANY && l != left) continue;
+                        for (int r = 0; r < SHAPE_COUNT; r++) {
+                            work.add(1);
+                            if (right == CheckedSchemaShapeIndex.ANY || right == r) {
+                                masks[l * SHAPE_COUNT + r] |= 1L << row;
+                                work.add(1);
+                            }
+                        }
+                    }
+                }
+            }
+            minimumNodes = minimum;
+        }
+        @Override public Set<Map.Entry<String, List<CheckedSchemaMatcherPlan.Entry>>> entrySet() { return buckets.entrySet(); }
+        @Override public List<CheckedSchemaMatcherPlan.Entry> get(Object key) { return buckets.get(key); }
+        @Override public void retainedReferences(RetainedGraph.Visitor v) {
+            v.reference(buckets); v.reference(ranges); v.reference(childMasks);
+        }
+    }
+
     private static final class IndexedEntries extends AbstractList<Entry> implements RetainedGraph.View {
         private final List<Entry> entries;
         private final CheckedSchemaShapeIndex shapes;
@@ -220,9 +313,11 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
     public de.regelsuche.search.moves.ExprIncrementalProvider nativeProvider() {
         return new NativeProvider();
     }
-    public RegisteredIncrementalMoveProvider provider() {
+    public RegisteredIncrementalMoveProvider provider() { return provider(null); }
+
+    RegisteredIncrementalMoveProvider provider(CheckedDomainSizeReceipts receipts) {
         var registration = new Registration(definition,
-            (state, context, meter) -> CheckedSchemaCursor.legacy(this, state.expression(), meter));
+            (state, context, meter) -> CheckedSchemaCursor.legacy(this, state.expression(), meter, receipts));
         return new RegisteredIncrementalMoveProvider(descriptor, definition, new Registry(List.of(registration)));
     }
     final class NativeProvider implements ExprIncrementalProvider,RetainedGraph.View {
@@ -230,7 +325,7 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
             de.regelsuche.retention.RetainedOperation.work(1);
             // This predicate is the installed checker's execution-inventory boundary.
             // New dispatch/path accounting is not silently promoted under the old revision.
-            return model==expected && expected.ownsApplication(application) && !indexedDispatch();
+            return model==expected && expected.ownsApplication(application) && !indexedDispatch() && !selectsSites();
         }
         @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(CheckedSchemaMatcherPlan.this);}
         private NativeProvider() {}

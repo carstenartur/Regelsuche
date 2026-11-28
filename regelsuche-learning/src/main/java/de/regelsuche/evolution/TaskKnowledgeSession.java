@@ -15,6 +15,7 @@ public final class TaskKnowledgeSession implements AutoCloseable {
             long retainedCharacters, long lookupWork, long preparationWork, boolean accountingComplete) { }
 
     private final EvolutionGenome inventory;
+    private final CumulativeTaskKnowledge.MatcherPreparation matcherPreparation;
     private final int maximumGenerations;
     private final long maximumCharacters;
     private final LinkedHashMap<String, CumulativeTaskKnowledge> retained = new LinkedHashMap<>(16, .75f, true);
@@ -22,7 +23,13 @@ public final class TaskKnowledgeSession implements AutoCloseable {
     private boolean closed;
 
     public TaskKnowledgeSession(EvolutionGenome inventory, int maximumGenerations, long maximumCharacters) {
+        this(inventory, maximumGenerations, maximumCharacters, CumulativeTaskKnowledge.MatcherPreparation.SHAPE_INDEX);
+    }
+
+    public TaskKnowledgeSession(EvolutionGenome inventory, int maximumGenerations, long maximumCharacters,
+            CumulativeTaskKnowledge.MatcherPreparation matcherPreparation) {
         this.inventory = Objects.requireNonNull(inventory);
+        this.matcherPreparation = Objects.requireNonNull(matcherPreparation);
         if (maximumGenerations < 1 || maximumGenerations > 256 || maximumCharacters < 1)
             throw new IllegalArgumentException("positive bounded prepared-generation capacity required");
         this.maximumGenerations = maximumGenerations;
@@ -43,7 +50,7 @@ public final class TaskKnowledgeSession implements AutoCloseable {
                 hits = Math.addExact(hits, 1);
                 return new Preparation(cached, true, lookup, 0);
             }
-            var knowledge = CumulativeTaskKnowledge.restorePrepared(inventory, json);
+            var knowledge = CumulativeTaskKnowledge.restore(inventory, json, matcherPreparation);
             long setup = knowledge.sessionSetupWork();
             preparationWork = Math.addExact(preparationWork, setup);
             remember(knowledge);
@@ -72,8 +79,8 @@ public final class TaskKnowledgeSession implements AutoCloseable {
     public synchronized Preparation retainVerified(CumulativeTaskKnowledge knowledge) {
         if (closed) throw new IllegalStateException("knowledge session is closed");
         Objects.requireNonNull(knowledge);
-        if (!inventory.contentHash().equals(knowledge.inventoryHash()) || !knowledge.usesIndexedPreparation())
-            throw new IllegalArgumentException("same-inventory prepared knowledge required");
+        if (!inventory.contentHash().equals(knowledge.inventoryHash()) || knowledge.matcherPreparation() != matcherPreparation)
+            throw new IllegalArgumentException("knowledge must match the session inventory and matcher preparation");
         admissions = Math.addExact(admissions, 1);
         String canonical = knowledge.toCanonicalJson();
         long lookup = Math.addExact(canonical.length(), 1L);
