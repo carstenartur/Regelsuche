@@ -326,6 +326,16 @@ Der neue Pfad übernimmt die geprüfte Parserwurzel und erzeugt Zerlegungen dün
 - [`ProspectiveFormationArchive.java`](../../regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/ProspectiveFormationArchive.java#L27) <!-- strategy-code: regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/ProspectiveFormationArchive.java | public final class ProspectiveFormationArchive { -->
 - [`ProspectiveFormationArchiveTest.java`](../../regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/ProspectiveFormationArchiveTest.java#L27) <!-- strategy-code: regelsuche-discovery/src/test/java/de/regelsuche/discovery/representation/ProspectiveFormationArchiveTest.java | class ProspectiveFormationArchiveTest { -->
 
+## Wiederholte Teilausdrücke als exakten Rechenplan ausführen
+
+- **Hypothese.** Eine aus dem Quellbaum gewählte gemeinsame Definition spart auf externen Ausdrücken ausgeführte rationale Operationen.
+- **Umsetzungsstand.** Der normale Einstieg `ExactSharingRepresentation.prepareArithmetic()` übersetzt die geprüften Vorkommen in Registerverweise. Auswertung und Kontrollverfahren zählen ausgeführte Additionen, Subtraktionen, Multiplikationen und Divisionen.
+- **Befund.** Das vorab veröffentlichte Verfahren erfasst alle 70 Programme aus zehn weiteren FPBench-Dateien. Sieben erfüllen die bestehenden Projektionsgrenzen. Bei der TensorFlow-Lite-Varianz über vier Werte sinkt die Zahl der Operationen von 18 auf 14. Eine vollständige gemeinsame Teilausdruckseliminierung benötigt ebenfalls 14. Die sechs übrigen Programme bleiben gleich. Alle 28 rationalen Ausgaben stimmen überein. [Protokoll, Einzelfälle und Reproduktion](external-sharing-v1/results.md)
+- **Folgerung.** Die Darstellung gewinnt die im FPCore-Original bereits gebundene Mittelwertberechnung nach der Expansion zurück. Für einen Vorteil gegenüber gewöhnlicher Teilausdruckseliminierung oder durch Lernen auf neuen Familien fehlt weiterhin ein Beleg.
+
+- [`ExactSharingArithmetic.java`](../../regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/ExactSharingArithmetic.java#L16) <!-- strategy-code: regelsuche-discovery/src/main/java/de/regelsuche/discovery/representation/ExactSharingArithmetic.java | public final class ExactSharingArithmetic { -->
+- [`ExternalSharingStudyTest.java`](../../regelsuche-experiments/src/test/java/de/regelsuche/benchmark/peer/ExternalSharingStudyTest.java#L40) <!-- strategy-code: regelsuche-experiments/src/test/java/de/regelsuche/benchmark/peer/ExternalSharingStudyTest.java | class ExternalSharingStudyTest { -->
+
 ## Gelernte Brücke zur Faktorisierung
 
 - **Hypothese.** Eine aus zwei Koeffizientenreihen gelernte Brücke spart Sucharbeit in zurückgehaltenen Aufgabenfamilien.
