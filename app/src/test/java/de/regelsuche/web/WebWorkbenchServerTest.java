@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -201,24 +202,37 @@ class WebWorkbenchServerTest {
             """).getResponseCode());
     }
 
-    @Test void countsEditedSignedCnfAndReturnsACheckedDownloadWithExactIntegers() throws IOException {
-        String path = "/api/certificate-demos/cnf/" + java.util.UUID.randomUUID();
-        String body = """
-            {"variableCount":62,"clauses":[[1,-2]],"fixed":[1],"maximumWork":1000000}
-            """;
-        var response = postJson(path, body);
+    @Test
+    void countsEditedSignedCnfAndReturnsACheckedDownloadWithExactIntegers() throws IOException {
+        var response = postSignedCnf("[[1,-2]]", 1_000_000);
         assertEquals(200, response.getResponseCode());
         var report = new com.fasterxml.jackson.databind.ObjectMapper().readTree(response.getInputStream());
         assertEquals("EXACT", report.path("status").asText());
         assertEquals("2305843009213693952", report.path("count").textValue());
         assertEquals(62, report.at("/certificate/source/variableCount").intValue());
         assertEquals(report.path("count"), report.at("/certificate/elimination/total"));
-        assertEquals(400, postJson(path, body.replace("[1,-2]", "[0]")).getResponseCode());
-        var limited = postJson(path, body.replace("1000000", "1"));
+    }
+
+    @Test
+    void rejectsZeroAsASignedCnfLiteral() throws IOException {
+        assertEquals(400, postSignedCnf("[[0]]", 1_000_000).getResponseCode());
+    }
+
+    @Test
+    void reportsTheCnfWorkLimitWithoutACertificate() throws IOException {
+        var limited = postSignedCnf("[[1,-2]]", 1);
+        assertEquals(200, limited.getResponseCode());
         var unavailable = new com.fasterxml.jackson.databind.ObjectMapper().readTree(limited.getInputStream());
         assertEquals("UNAVAILABLE", unavailable.path("status").asText());
         assertEquals("WORK_LIMIT", unavailable.path("reason").asText());
         assertFalse(unavailable.has("certificate"));
+    }
+
+    private HttpURLConnection postSignedCnf(String clauses, int maximumWork) throws IOException {
+        String body = String.format(Locale.ROOT, """
+            {"variableCount":62,"clauses":%s,"fixed":[1],"maximumWork":%d}
+            """, clauses, maximumWork);
+        return postJson("/api/certificate-demos/cnf/" + java.util.UUID.randomUUID(), body);
     }
 
     private HttpURLConnection postPairReduction(String request) throws IOException {
