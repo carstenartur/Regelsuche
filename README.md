@@ -261,6 +261,14 @@ Aufwand von 834.410 auf 823.252 logische Einheiten (1,34 Prozent). Im ersten,
 kürzeren Versuch lösten beide 128 von 128 Aufgaben.
 [Versuchsplan, Vergleichsarme und Rohdaten](docs/research/prospective-amortization/README.md)
 
+Eine gemeinsame Knotenzählung erhöhte auf demselben Aufgabenstrom die Zahl
+der Lösungen auf **708**, ohne Lernregeln waren es **699**. Bei 1.024 neuen
+Summen benachbarter Rechteckflächen blieb die primitive Faktorisierung vorn.
+Sie löste unter der vorab festgelegten Budgetgrenze alle **1.024** Aufgaben,
+der optimierte Lernsolver **678**. Alle fünf Varianten lieferten für jede
+Rechtecksumme denselben Beweis aus primitiven Faktorisierungsschritten.
+[Transferstudie und beide Vergleichsrechnungen](docs/research/prospective-interval-transfer/README.md)
+
 Der qualifizierte autonome Walkthrough bildet aus targetfreien Beobachtungen
 einen parametrisierten Kandidaten, trennt Kandidatenbildung und Prüfung und
 misst anschließend die Wiederverwendung auf zurückgehaltenen Aufgaben. Im hier

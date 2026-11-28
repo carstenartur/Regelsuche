@@ -388,7 +388,7 @@ Lerner und Strategieauswahl im aktuellen Checkout
 
 - [`CheckedSchemaMatcherPlan.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaMatcherPlan.java#L36) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaMatcherPlan.java | public final class CheckedSchemaMatcherPlan implements RetainedGraph.View { -->
 - [`PrimitiveSchemaReachability.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/PrimitiveSchemaReachability.java#L15) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/PrimitiveSchemaReachability.java | final class PrimitiveSchemaReachability { -->
-- [`CheckedSchemaSelectionDifferentialTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java#L30) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java | class CheckedSchemaSelectionDifferentialTest { -->
+- [`CheckedSchemaSelectionDifferentialTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java#L31) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java | class CheckedSchemaSelectionDifferentialTest { -->
 
 ## Distributive Teilableitungen bei gleicher Budgetgrenze
 
@@ -410,6 +410,16 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - **Vorab festgelegter Folgeversuch.** Auf 1.024 neuen Horner- und Skalarproduktaufgaben erreichte der neue Lernsolver bei 524.288 Gesamteinheiten 646 Lösungen, die primitive Suche 642, der frühere Lernsolver 635 und der neue Solver ohne Lernregeln 541. Der vollständige Durchlauf kostete 823.252 gegenüber 834.410 Einheiten primitiv. Alle vier Arme lösten am Ende alle Aufgaben. Der Vorteil von 1,34 Prozent gilt für diesen synthetischen Aufgabenstrom einschließlich Erwerb, Vorbereitung, Suche und unabhängiger Prüfungen. [Protokoll, Rohdaten und unabhängige Prüfung](prospective-amortization/README.md)
 
 - [`HornerTransferStudyTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/HornerTransferStudyTest.java#L34) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/HornerTransferStudyTest.java | class HornerTransferStudyTest { -->
+
+## Geprüfte Knotenzahlen für das Suchziel wiederverwenden
+
+- **Hypothese.** Ein während der Suche bereits geprüfter, unveränderlicher Ausdruck kann seine Knotenzahl an die Zielbewertung derselben Aufgabe weitergeben. Der Versuch prüft, ob dadurch insgesamt mehr Aufgaben gelöst werden und ob die sieben gelernten Regeln auf Summen benachbarter Rechteckflächen übertragen werden.
+- **Umsetzungsstand.** Der optionale Modus `DOMAIN_RECEIPTS_WITH_ROUTING` verwendet bei identischem Ausdruck die bezahlte Knotenzahl. Eine erfolglose Abfrage bezahlt zusätzlich die gewöhnliche Zählung. Die beiden mathematischen Prüfungen bleiben aktiv.
+- **Befund.** Auf dem bekannten Horner-/Skalarproduktstrom löste der neue Modus 708 Aufgaben, die bisherige Lernsuche 646, die primitive Suche 642 und derselbe neue Modus ohne Lernregeln 699. Auf der prospektiven dritten Familie lagen die entsprechenden Zahlen bei 678, 615, 1.024 und 959. Der unabhängige Prüfer bestätigte 5.120 Ergebniszeilen. [Versuchsplan, Rohdaten und Reproduktion](prospective-interval-transfer/README.md)
+- **Folgerung.** Die gemeinsame Knotenzählung spart Arbeit. Bei den Rechtecksummen gelangten ausschließlich primitive Faktorisierungsschritte in die Beweise. Dort kostete das Bereithalten der Lernregeln im optimierten Solver 109.568 zusätzliche Einheiten.
+
+- [`TypedLearnedMoveInventory.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/TypedLearnedMoveInventory.java#L141) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/TypedLearnedMoveInventory.java | public CheckedSchemaTaskSolver newTaskSolverWithDomainReceipts(CheckedLearnedSchemaModel model) { -->
+- [`IntervalTransferStudyTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/IntervalTransferStudyTest.java#L25) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/IntervalTransferStudyTest.java | class IntervalTransferStudyTest { -->
 
 ## Vorbereitetes Aufgabenwissen über mehrere Anfragen
 
