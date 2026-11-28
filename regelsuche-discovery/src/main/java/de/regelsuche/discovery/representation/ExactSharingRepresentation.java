@@ -172,6 +172,11 @@ public record ExactSharingRepresentation(
         return sourceExpression;
     }
 
+    /** Prepares the certified definition and references for exact four-operation arithmetic. */
+    public ExactSharingArithmetic prepareArithmetic() {
+        return ExactSharingArithmetic.prepare(this);
+    }
+
     public String toCanonicalJson() {
         try {
             return JSON.writeValueAsString(this);
