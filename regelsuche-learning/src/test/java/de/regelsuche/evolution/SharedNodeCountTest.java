@@ -31,10 +31,26 @@ class SharedNodeCountTest {
         assertEquals(0, shared.learnedApplications());
 
         var stuck = task("x+y", CheckedSchemaTaskSolver.Goal.atMostNodes(1));
+        var original = solver.solve(stuck);
         var exhausted = solver.solveWithSharedNodeCounts(stuck);
+        assertFalse(original.solved());
         assertFalse(exhausted.solved());
-        assertTrue(exhausted.evidence().search().completeBoundedRelation());
-        assertEquals(MoveSearch.Outcome.BOUNDED_EXHAUSTED, exhausted.evidence().search().outcome());
+        // The ordinary typed primitive provider explicitly returns incomplete batches.
+        assertEquals(MoveSearch.Outcome.INCONCLUSIVE, original.evidence().search().outcome());
+        assertFalse(original.evidence().search().completeBoundedRelation());
+        assertEquals(original.evidence().search().outcome(), exhausted.evidence().search().outcome());
+        assertEquals(original.evidence().search().completeBoundedRelation(),
+            exhausted.evidence().search().completeBoundedRelation());
+
+        // An empty provider inventory really does enumerate its entire (empty) relation.
+        var emptySession = new TypedLearnedMoveInventory.SearchSession(List.of(), List.of(),
+            (state, move, context) -> { throw new AssertionError("empty inventory produced a move"); });
+        var emptySolver = new CheckedSchemaTaskSolver(emptySession, null);
+        for (var answer : List.of(emptySolver.solve(stuck), emptySolver.solveWithSharedNodeCounts(stuck))) {
+            assertFalse(answer.solved());
+            assertTrue(answer.evidence().search().completeBoundedRelation());
+            assertEquals(MoveSearch.Outcome.BOUNDED_EXHAUSTED, answer.evidence().search().outcome());
+        }
     }
 
     @Test void paysForNativeVisitsAndRepeatedLookupsByTreeIdentity() {
