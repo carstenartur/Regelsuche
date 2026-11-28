@@ -472,8 +472,8 @@ class Z3EqualityProofReplayTest {
     void equationAndOrderRescalingHaveSeparateCacheAuthority() {
         var values = new Z3ProofValues(java.util.Set.of("x", "y"));
         var rewrites = new Z3PolynomialProofRewrites(statement("x+y", "0"), values);
-        assertTrue(rewrites.verifies(rewrite(values, "(= (= 0.0 x) (= x 0.0))")));
-        assertFalse(rewrites.verifies(rewrite(values, "(= (<= x 0.0) (<= 0.0 x))")));
+        assertTrue(rewrites.verifies(rewrite(values, "(= (= 0.0 (* 2.0 x)) (= x 0.0))")));
+        assertFalse(rewrites.verifies(rewrite(values, "(= (<= (* 2.0 x) 0.0) (<= 0.0 x))")));
         assertTrue(rewrites.verifies(rewrite(values,
             "(= (<= (+ x y) 0.0) (<= (* 0.5 (+ x y)) 0.0))")));
         assertFalse(rewrites.verifies(rewrite(values,
