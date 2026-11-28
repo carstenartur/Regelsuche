@@ -363,11 +363,11 @@ Lerner und Strategieauswahl im aktuellen Checkout
 
 - **Hypothese.** Zwei gelöste Aufgaben mit unterschiedlichen Gesamtumformungen können dieselbe lokale mehrschrittige Ableitung enthalten. Ihre Verallgemeinerung kann in einem weiteren Kontext Sucharbeit ersparen.
 - **Umsetzungsstand.** `CumulativeTaskKnowledge.learnLocalBatch` untersucht in den unabhängig geprüften Lösungswegen echte Mehrschrittabschnitte. Ändert ein Schritt nur einen Operanden, kann die Suche die Änderungen in diesem Teilbaum getrennt verfolgen. Sie speichert die Position und die ursprünglichen Schrittindizes. Budgetierte Bildung, symbolische Identitätsprüfung, Validierung und erneute Prüfung im Empfänger verwenden denselben Aufgabenlöser wie der Vergleich mit vollständigen Endpunkten.
-- **Befund.** Die Regression lernt aus zwei verschiedenen Trainingspolynomen mit Änderungen in beiden Zweigen eine gemeinsame Umformung aus den Schritten 0 und 2. Bei höchstens einer Suchkante in der Validierung kann das geprüfte Schema das Knotenziel erreichen. Der wiederhergestellte Bestand verwendet es auch unter einem neuen äußeren Operator. Der Vergleich über die vollständigen Trainingsendpunkte gewinnt in diesem Fall kein Schema.
+- **Befund.** Die Regression lernt aus zwei verschiedenen Trainingspolynomen mit Änderungen in beiden Zweigen eine gemeinsame Umformung aus den Schritten 0 und 2. Bei höchstens einer Suchkante in der Validierung kann das geprüfte Schema das Knotenziel erreichen. Der wiederhergestellte Bestand verwendet es mit einer zusammengesetzten Einsetzung auch im rechten Operanden einer Addition. Der Vergleich über die vollständigen Trainingsendpunkte gewinnt in diesem Fall kein Schema.
 - **Folgerung.** Der Test belegt Herkunft, Ausführung und erneute Prüfung. Einen Kostenvorteil über neue Familien müssen Vergleiche mit identischen Budgets einschließlich Erwerb und Ausführung messen.
 
 - [`TaskSubpathMiner.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskSubpathMiner.java#L12) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/TaskSubpathMiner.java | final class TaskSubpathMiner { -->
-- [`TaskSubpathLearningTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskSubpathLearningTest.java#L10) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskSubpathLearningTest.java | class TaskSubpathLearningTest { -->
+- [`TaskSubpathLearningTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskSubpathLearningTest.java#L13) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/TaskSubpathLearningTest.java | class TaskSubpathLearningTest { -->
 
 ## Vorbereitetes Aufgabenwissen über mehrere Anfragen
 
