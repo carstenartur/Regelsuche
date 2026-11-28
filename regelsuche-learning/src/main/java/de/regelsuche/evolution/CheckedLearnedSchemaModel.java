@@ -108,6 +108,14 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             supportingObservationIds = observations.stream().distinct().sorted().toList();
             structuralReduction = patternNodes(source) - patternNodes(target);
         }
+        private Schema(Schema proved, List<String> observations) {
+            id = proved.id;
+            source = proved.source;
+            target = proved.target;
+            proofHash = proved.proofHash;
+            structuralReduction = proved.structuralReduction;
+            supportingObservationIds = List.copyOf(observations);
+        }
         public String id() { return id; }
         public PatternExpr source() { return source; }
         public PatternExpr target() { return target; }
@@ -383,6 +391,63 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         if (!seen.add(key)) return false;
         output.add(new ObservedPair(inputId, origin, new TypedPatternGeneralizer.Example(source, target)));
         return true;
+    }
+
+    /** The new composition bill excludes the acquisitions and loads already paid by its caller. */
+    public record Retention(CheckedLearnedSchemaModel model, long work, List<String> omittedSchemaIds) {
+        public Retention { omittedSchemaIds = List.copyOf(omittedSchemaIds); }
+    }
+
+    /**
+     * Combine two independently acquired libraries. An ordinary sequential learnLocalBatch
+     * already retains its parent's schemata. This operation also accepts separately restored
+     * libraries, whose statements were checked by load(). The incumbent has priority when
+     * the schema cap is reached. Cost includes inspecting both libraries, combining provenance
+     * and materializing the content-addressed result. Both source model IDs remain in the
+     * canonical model. The original models retain their complete acquisition histories.
+     */
+    public Retention retainWith(CheckedLearnedSchemaModel additional) {
+        Objects.requireNonNull(additional);
+        if (!inventoryHash.equals(additional.inventoryHash) || !bounds.equals(additional.bounds)
+                || !requiredAssumptions.equals(additional.requiredAssumptions)) {
+            throw new IllegalArgumentException("retained libraries require identical inventory, bounds and assumptions");
+        }
+        var work = new Work();
+        work.add(4L + requiredAssumptions.size());
+        if (modelHash.equals(additional.modelHash)) return new Retention(this, work.units, List.of());
+
+        var admitted = new TreeMap<>(byId);
+        var omitted = new ArrayList<String>();
+        work.add(admitted.size());
+        for (var incoming : additional.schemas) {
+            work.add(2);
+            var old = admitted.get(incoming.id());
+            if (old != null) {
+                var origins = new java.util.TreeSet<>(old.supportingObservationIds());
+                origins.addAll(incoming.supportingObservationIds());
+                work.add((long) old.supportingObservationIds().size() + incoming.supportingObservationIds().size());
+                if (origins.size() > 256) throw new IllegalArgumentException("retained observation limit exceeded");
+                if (origins.size() > old.supportingObservationIds().size()) {
+                    admitted.put(old.id(), new Schema(old, List.copyOf(origins)));
+                    work.add(origins.size());
+                }
+            } else if (admitted.size() < bounds.maximumSchemas()) {
+                admitted.put(incoming.id(), incoming);
+            } else {
+                omitted.add(incoming.id());
+            }
+        }
+        var sources = new Attempt(List.of(modelHash, additional.modelHash), "RETAINED_LIBRARIES",
+            "INCUMBENT_FIRST;OMITTED=" + omitted.size());
+        String origin = SchematicProofPlan.hash("retained-checked-libraries/v1\n" + modelHash + "\n" + additional.modelHash);
+        work.add(admitted.size() + 2L);
+        var combined = new CheckedLearnedSchemaModel(inventoryHash, origin, bounds, requiredAssumptions,
+            List.copyOf(admitted.values()), List.of(sources), work.units, 0);
+        if (combined.canonicalJson.length() > MAXIMUM_JSON_CHARACTERS) {
+            throw new IllegalArgumentException("retained model exceeds the checked schema JSON size limit");
+        }
+        work.add(combined.canonicalJson.length());
+        return new Retention(combined, work.units, omitted);
     }
 
     public List<Schema> schemas() { return schemas; }
