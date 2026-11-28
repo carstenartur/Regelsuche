@@ -324,7 +324,7 @@ public final class CostAwareTacticRouter {
         return new Result(work.units, admit, answer.evidence(), task.budget().totalWork(), answer.solved());
     }
 
-    private static CheckedSchemaTaskSolver.Task remaining(CheckedSchemaTaskSolver.Task task, long spent) {
+    static CheckedSchemaTaskSolver.Task remaining(CheckedSchemaTaskSolver.Task task, long spent) {
         var original = task.budget();
         var budget = new MoveSearch.Budget(original.maxPrimitiveSteps(), original.maxSearchDepth(), original.maxTheoryWork(),
             original.maxStates(), Math.max(1, original.totalWork() - spent), original.maxComplexityDebt());

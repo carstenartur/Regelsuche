@@ -1,0 +1,252 @@
+{
+  "training": {
+    "tasks": 26,
+    "successful": 26,
+    "primitiveSteps": 93,
+    "sourceRead": 3973,
+    "lessonSearchAndReplay": 7145,
+    "formation": 1450,
+    "load": 512,
+    "cold": 13080
+  },
+  "rotations": {
+    "byteIdentical": true,
+    "files": 19,
+    "sha256": {
+      "C/DROP_ORDER.jsonl": "f85fb3a4883aa0192948f4cd9b2bb75564d83a80ef593cecf318a722ea11dd92",
+      "C/GREEDY.jsonl": "b51c85bf52a6d1b8a8bc73a6ef7653a2874b2bcbf3cf376c7a0ab6f1273f1f93",
+      "C/ORDERED.jsonl": "63f4a71691d82128b8dc12b40136d5c7e36858093d54b6756a5d7641fb6e95b3",
+      "C/SUBTREE.jsonl": "a4ff6f78d75d586ff3c88d29733cd46eda473fb26bebb46e4c6d387eadebbd52",
+      "C/paths.json": "536196ae2596c9b20291069a5af133d4794a67c27b323ce318360dd988e6a797",
+      "C/summary.json": "decf6fc7aa52470670f8e124e23c2521c6ce5bb3b04f8cf3eaa1e7896217d146",
+      "D/DROP_ORDER.jsonl": "cb1eedd923e3ffa6bf6aa22708f90d8af1efb33a4ecdfc5fda948973f69e201d",
+      "D/GREEDY.jsonl": "25782733e97e615a4f4cc54b75865e8ba1b7bd96897527d76c000b5b290cc456",
+      "D/ORDERED.jsonl": "40e27b60d78d49416c54f31410c40773bb8df849cfea89ac0b1deed8f9aa765a",
+      "D/SUBTREE.jsonl": "aeb046db1fd1a9cdf55131f1bc41b80aaab0584ab7fea8366a9597c61e27770b",
+      "D/paths.json": "898df9f61701e1e87ae2af0a8dc1699054a0aceae1c94319475142f76ff4e6a9",
+      "D/summary.json": "c454f97559a8811375021cc852e6303097d24cec3d48c049d69436c6306612ed",
+      "MIXED/DROP_ORDER.jsonl": "24575a31d30a84c3e58294396f8083af1005e5005979caec53fbaa56c7fb2390",
+      "MIXED/GREEDY.jsonl": "038ea1186cd50a83cbe022e4ff2bad922e755448b9140a22d8327bb05ea51ee6",
+      "MIXED/ORDERED.jsonl": "2f91644e808433de6c64e23fe717a034d824f0e9ae4da064a4abb54b35b75cc6",
+      "MIXED/SUBTREE.jsonl": "41efd3122b9cd654366e7ac410fb01b2a6a24e1742b2e41fe6d50f52aa8ea0dd",
+      "MIXED/paths.json": "83aededa779915bb19d2b119be4885b54d87eb5cae04f46d04ae344ac591ca4f",
+      "MIXED/summary.json": "84c491c2363ef4897419cc52552f4fe9f5b766a89f4565f6ec42f0abe8e46c67",
+      "training.json": "7999119708608dcce7608fddbfec6e95dc4a103a093570df6cf223c1168cf42b"
+    }
+  },
+  "panels": {
+    "MIXED": {
+      "tasks": 1024,
+      "deadline": 524288,
+      "arms": {
+        "ORDERED": {
+          "byDeadline": 1011,
+          "totalSolved": 1024,
+          "fullCost": 530910,
+          "cold": 13080,
+          "query": 323324,
+          "replay": 21248,
+          "audit": 173258
+        },
+        "DROP_ORDER": {
+          "byDeadline": 939,
+          "totalSolved": 1024,
+          "fullCost": 569822,
+          "cold": 13080,
+          "query": 362236,
+          "replay": 21248,
+          "audit": 173258
+        },
+        "GREEDY": {
+          "byDeadline": 965,
+          "totalSolved": 1024,
+          "fullCost": 556742,
+          "cold": 0,
+          "query": 362236,
+          "replay": 21248,
+          "audit": 173258
+        },
+        "SUBTREE": {
+          "byDeadline": 931,
+          "totalSolved": 1024,
+          "fullCost": 575430,
+          "cold": 0,
+          "query": 380924,
+          "replay": 21248,
+          "audit": 173258
+        }
+      },
+      "orderedVersus": {
+        "GREEDY": {
+          "querySaving": 38912,
+          "totalSavingIncludingCold": 25832,
+          "extraByDeadline": 46,
+          "solvedOnlyByOrdered": 0,
+          "solvedOnlyByReference": 0,
+          "firstStrictCumulativeSavingAt": 345,
+          "sustainedStrictCumulativeSavingFrom": 345
+        },
+        "SUBTREE": {
+          "querySaving": 57600,
+          "totalSavingIncludingCold": 44520,
+          "extraByDeadline": 80,
+          "solvedOnlyByOrdered": 0,
+          "solvedOnlyByReference": 0,
+          "firstStrictCumulativeSavingAt": 233,
+          "sustainedStrictCumulativeSavingFrom": 233
+        },
+        "DROP_ORDER": {
+          "querySaving": 38912,
+          "totalSavingIncludingCold": 38912,
+          "extraByDeadline": 72,
+          "solvedOnlyByOrdered": 0,
+          "solvedOnlyByReference": 0,
+          "firstStrictCumulativeSavingAt": 1,
+          "sustainedStrictCumulativeSavingFrom": 1
+        }
+      }
+    },
+    "C": {
+      "tasks": 512,
+      "deadline": 524288,
+      "arms": {
+        "ORDERED": {
+          "byDeadline": 416,
+          "totalSolved": 416,
+          "fullCost": 256472,
+          "cold": 13080,
+          "query": 155776,
+          "replay": 11936,
+          "audit": 75680
+        },
+        "DROP_ORDER": {
+          "byDeadline": 416,
+          "totalSolved": 416,
+          "fullCost": 276728,
+          "cold": 13080,
+          "query": 175328,
+          "replay": 11552,
+          "audit": 76768
+        },
+        "GREEDY": {
+          "byDeadline": 416,
+          "totalSolved": 416,
+          "fullCost": 263648,
+          "cold": 0,
+          "query": 175328,
+          "replay": 11552,
+          "audit": 76768
+        },
+        "SUBTREE": {
+          "byDeadline": 416,
+          "totalSolved": 416,
+          "fullCost": 272800,
+          "cold": 0,
+          "query": 184096,
+          "replay": 11392,
+          "audit": 77312
+        }
+      },
+      "orderedVersus": {
+        "GREEDY": {
+          "querySaving": 19552,
+          "totalSavingIncludingCold": 7176,
+          "extraByDeadline": 0,
+          "solvedOnlyByOrdered": 0,
+          "solvedOnlyByReference": 0,
+          "firstStrictCumulativeSavingAt": 333,
+          "sustainedStrictCumulativeSavingFrom": 333
+        },
+        "SUBTREE": {
+          "querySaving": 28320,
+          "totalSavingIncludingCold": 16328,
+          "extraByDeadline": 0,
+          "solvedOnlyByOrdered": 0,
+          "solvedOnlyByReference": 0,
+          "firstStrictCumulativeSavingAt": 227,
+          "sustainedStrictCumulativeSavingFrom": 227
+        },
+        "DROP_ORDER": {
+          "querySaving": 19552,
+          "totalSavingIncludingCold": 20256,
+          "extraByDeadline": 0,
+          "solvedOnlyByOrdered": 0,
+          "solvedOnlyByReference": 0,
+          "firstStrictCumulativeSavingAt": 1,
+          "sustainedStrictCumulativeSavingFrom": 1
+        }
+      }
+    },
+    "D": {
+      "tasks": 512,
+      "deadline": 524288,
+      "arms": {
+        "ORDERED": {
+          "byDeadline": 512,
+          "totalSolved": 512,
+          "fullCost": 190470,
+          "cold": 13080,
+          "query": 93228,
+          "replay": 5248,
+          "audit": 78914
+        },
+        "DROP_ORDER": {
+          "byDeadline": 512,
+          "totalSolved": 512,
+          "fullCost": 189702,
+          "cold": 13080,
+          "query": 92460,
+          "replay": 5248,
+          "audit": 78914
+        },
+        "GREEDY": {
+          "byDeadline": 512,
+          "totalSolved": 512,
+          "fullCost": 176622,
+          "cold": 0,
+          "query": 92460,
+          "replay": 5248,
+          "audit": 78914
+        },
+        "SUBTREE": {
+          "byDeadline": 512,
+          "totalSolved": 512,
+          "fullCost": 178542,
+          "cold": 0,
+          "query": 94380,
+          "replay": 5248,
+          "audit": 78914
+        }
+      },
+      "orderedVersus": {
+        "GREEDY": {
+          "querySaving": -768,
+          "totalSavingIncludingCold": -13848,
+          "extraByDeadline": 0,
+          "solvedOnlyByOrdered": 0,
+          "solvedOnlyByReference": 0,
+          "firstStrictCumulativeSavingAt": null,
+          "sustainedStrictCumulativeSavingFrom": null
+        },
+        "SUBTREE": {
+          "querySaving": 1152,
+          "totalSavingIncludingCold": -11928,
+          "extraByDeadline": 0,
+          "solvedOnlyByOrdered": 0,
+          "solvedOnlyByReference": 0,
+          "firstStrictCumulativeSavingAt": null,
+          "sustainedStrictCumulativeSavingFrom": null
+        },
+        "DROP_ORDER": {
+          "querySaving": -768,
+          "totalSavingIncludingCold": -768,
+          "extraByDeadline": 0,
+          "solvedOnlyByOrdered": 0,
+          "solvedOnlyByReference": 0,
+          "firstStrictCumulativeSavingAt": 1,
+          "sustainedStrictCumulativeSavingFrom": null
+        }
+      }
+    }
+  }
+}

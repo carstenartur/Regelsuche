@@ -20,8 +20,8 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 /** Supplementary primitive-only technical control, outside the original ten-arm study. */
 @EnabledIfSystemProperty(named = "shared.counts.output", matches = ".+")
 class SharedNodeCountStudyTest {
-    private enum Arm { BASE, SHARED }
-    private record Summary(long setup, int totalSolved, int byDeadline, long fullCost, long query,
+    enum Arm { BASE, SHARED, SUBTREE }
+    record Summary(long setup, int totalSolved, int byDeadline, long fullCost, long query,
             long verificationInSearch, long replay, long audit, int proofPaths, String rowSha256) {}
 
     @Test void comparePrimitiveRuns() throws Exception {
@@ -61,27 +61,38 @@ class SharedNodeCountStudyTest {
         for (var panel : panels) {
             var results = new TreeMap<Arm,Summary>();
             for (var arm : rotation == 0 ? List.of(Arm.BASE, Arm.SHARED) : List.of(Arm.SHARED, Arm.BASE))
-                results.put(arm, measure(arm, panel, published.get(panel.name())));
+                results.put(arm, measure(arm, panel, arm == Arm.BASE ? published.get(panel.name()) : null));
             reports.put(panel.name(), results);
         }
         writeJson(Path.of(System.getProperty("shared.counts.output")), reports);
     }
 
-    private static Summary measure(Arm arm, RetainedTacticDevelopmentTest.Panel panel,
+    static Summary measure(Arm arm, RetainedTacticDevelopmentTest.Panel panel,
             List<PairedTacticStudyTest.Row> official) throws IOException, NoSuchAlgorithmException {
+        return measure(arm, panel, official, null);
+    }
+
+    static Summary measure(Arm arm, RetainedTacticDevelopmentTest.Panel panel,
+            List<PairedTacticStudyTest.Row> official, Path ledger) throws IOException, NoSuchAlgorithmException {
         var solver = TypedLearnedMoveInventory.primitives(TraceStrategyTransferExample.inventory()).newTaskSolver();
         var setup = new PairedTacticStudyTest.Setup(0, 0, 0, solver.preparationWork());
         var engine = new PairedTacticStudyTest.Engine(task -> {
-            var result = arm == Arm.BASE ? solver.solve(task) : solver.solveWithSharedNodeCounts(task);
+            var result = switch (arm) {
+                case BASE -> solver.solve(task);
+                case SHARED -> solver.solveWithSharedNodeCounts(task);
+                case SUBTREE -> solver.solveWithSubtreeNodeCounts(task);
+            };
             return new PairedTacticStudyTest.Sample(0, result.evidence());
         }, setup);
         var paths = new TreeMap<String,List<PairedTacticStudyTest.Step>>();
+        var rows = ledger == null ? null : new ArrayList<PairedTacticStudyTest.Row>();
         var hash = MessageDigest.getInstance("SHA-256");
         long clock = setup.total(), query = 0, verification = 0, replay = 0, audit = 0;
         int solved = 0, timely = 0;
         for (var input : panel.inputs()) {
             var row = PairedTacticStudyTest.run(engine, input, clock, paths);
-            if (arm == Arm.BASE && official != null) assertEquals(official.get(input.index()), row);
+            if (official != null) assertEquals(official.get(input.index()), row);
+            if (rows != null) rows.add(row);
             assertTrue(row.learnedSchemas().isEmpty());
             clock = row.completedAt();
             query += row.query();
@@ -96,6 +107,11 @@ class SharedNodeCountStudyTest {
             hash.update((byte) '\n');
         }
         assertEquals(setup.total() + query + replay + audit, clock);
+        if (ledger != null) {
+            Files.createDirectory(ledger);
+            PairedTacticStudyTest.writeLines(ledger.resolve(arm.name() + ".jsonl"), rows);
+            writeJson(ledger.resolve("paths.json"), paths);
+        }
         return new Summary(setup.total(), solved, timely, clock, query, verification, replay, audit,
             paths.size(), HexFormat.of().formatHex(hash.digest()));
     }

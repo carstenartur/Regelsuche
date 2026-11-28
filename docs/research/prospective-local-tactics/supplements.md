@@ -1,0 +1,12 @@
+# Secondary comparisons fixed before opening E
+
+The [registered primary test](protocol.md) has five arms. Two separate comparisons test how much of any practical advantage survives stronger controls. They use the same case order, goals and budgets as the primary study. Neither comparison changes its decision rule.
+
+1. **Remember sizes of unchanged children.** Run a standalone primitive solver using paid, query-local subtree sizes. Compare against the exact SHARED primitive ledger. Charge cache construction, lookups, traversals and eviction, keep the ordinary search budget and replay its chosen proof. Measure the same technique on the five already public streams and on E.
+2. **Learn the order in which to try primitive rules.** Derive an ordering from primitive transitions in earlier training proofs. Independently replay primitive steps, charge preparation and training, and compare with an otherwise identical greedy search using the original order and with ordinary subtree-count search. Evaluate E once with the frozen candidates. Report deadline completions and total work even if the training bill outweighs the benefit of the ordering. A change in order can help produce a primitive-only proof, so the symbolic single-rule test in the primary study measures a different intervention.
+
+For local admission on the two public development panels we compared immediate matching with a paid primitive pilot. Before the pilot run, its allowance was set to the smaller of the case cap and the larger of 1,024 units and half the cap. A failed pilot spends its search and replay before a learned attempt can begin. We chose the variant with the higher combined cold completion count on C and D, breaking ties by total work and requiring the regression with a necessary learned step to pass. The selected two-stage variant reached 384 and 480, versus 274 and 374 in the initial matcher pilot.
+
+The previously opened streams are development data. Report E separately. The arithmetic benchmark counts logical work in a particular Java execution model. Throughput on real expressions or a JVM timing gain would require a separate measurement.
+
+ENIGMA provides a research precedent for learning from earlier proofs to rank future search choices. It ranks clauses inside a saturation prover. The order model here ranks primitive rewrite rules by observed transitions and pays for acquiring its own training proofs. [Jakubův and Urban, ENIGMA (2017)](https://arxiv.org/abs/1701.06532)

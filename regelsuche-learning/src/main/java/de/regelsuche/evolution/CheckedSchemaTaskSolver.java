@@ -274,13 +274,23 @@ public final class CheckedSchemaTaskSolver {
         return preparation == null ? solveWithAdmission(task, java.util.Set.of()) : solve(task);
     }
 
+    /** Share native occurrence counts for unchanged subexpressions within one primitive query. */
+    public Solution solveWithSubtreeNodeCounts(Task task) {
+        return preparation == null ? solveWithAdmission(task, java.util.Set.of(), SubtreeNodeCounts::new) : solve(task);
+    }
+
     /** Run the selected lane and keep any proposal ablation downstream of its admission. */
     Solution solveWithAdmission(Task task, java.util.Set<String> disabledSchemas) {
+        return solveWithAdmission(task, disabledSchemas, CostAwareTacticRouter.QueryNodeCount::new);
+    }
+
+    private Solution solveWithAdmission(Task task, java.util.Set<String> disabledSchemas,
+            java.util.function.Supplier<TypedSourceOnlySearch.Objective> counter) {
         return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS, () -> {
             var scoped = scopedTask(task, prepare(task), disabledSchemas);
             if (preparation == null && scoped.objective() == NativeNodeCountObjective.INSTANCE
                     && !de.regelsuche.retention.RetainedOperation.isObserved()) {
-                var count = new CostAwareTacticRouter.QueryNodeCount();
+                var count = counter.get();
                 var original = scoped.problem();
                 var problem = new TypedMoveSearch.Problem(original.source(), original.context(), original.providers(),
                     original.policy(), original.verifier(), original.stateScore(), original.mode(), original.scheduling(),
