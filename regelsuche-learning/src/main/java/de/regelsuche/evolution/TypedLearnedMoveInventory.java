@@ -157,7 +157,8 @@ public final class TypedLearnedMoveInventory {
         return selectedSolver(model, false, Set.of(schemaId));
     }
 
-    private CheckedSchemaTaskSolver selectedSolver(CheckedLearnedSchemaModel model, boolean sharedContext, Set<String> included) {
+    // A restricted matcher keeps the full model verifier and its proof identity.
+    CheckedSchemaTaskSolver selectedSolver(CheckedLearnedSchemaModel model, boolean sharedContext, Set<String> included) {
         var plan = CheckedSchemaMatcherPlan.prepareSelected(model, model.bounds().maximumSchemas(), Map.of(), included);
         var checkedSession = newSchemaSearchSession(model, List.of(plan.provider()), true, sharedContext);
         var solver = new CheckedSchemaTaskSolver(checkedSession, plan.compilationReceipt(), plan);

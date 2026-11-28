@@ -1,0 +1,815 @@
+{
+  "acquisition" : 75408,
+  "batches" : [ {
+    "acquisition" : {
+      "lessons" : 2092,
+      "formation" : 20487,
+      "preparation" : 1741,
+      "validation" : 5452,
+      "selection" : 35,
+      "restoration" : 0,
+      "splitChecking" : 2539
+    },
+    "decision" : "PROMOTED",
+    "gates" : [ {
+      "base" : 800,
+      "candidate" : 464,
+      "cap" : 757,
+      "depth" : 8,
+      "index" : 3,
+      "previous" : 800,
+      "reference" : {
+        "output" : "a + 50004",
+        "solved" : true,
+        "witness" : [ {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_factor-left",
+          "schema" : null,
+          "source" : "(((a + 50004) * (1 - q) + (a + 50004) * q) * (1 - r) + ((a + 50004) * (1 - q) + (a + 50004) * q) * r) * (1 - p) + (((a + 50004) * (1 - q) + (a + 50004) * q) * (1 - r) + ((a + 50004) * (1 - q) + (a + 50004) * q) * r) * p",
+          "target" : "(((a + 50004) * (1 - q) + (a + 50004) * q) * (1 - r) + ((a + 50004) * (1 - q) + (a + 50004) * q) * r) * (1 - p + p)",
+          "verification" : 9
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "(((a + 50004) * (1 - q) + (a + 50004) * q) * (1 - r) + ((a + 50004) * (1 - q) + (a + 50004) * q) * r) * (1 - p + p)",
+          "target" : "(((a + 50004) * (1 - q) + (a + 50004) * q) * (1 - r) + ((a + 50004) * (1 - q) + (a + 50004) * q) * r) * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_factor-left",
+          "schema" : null,
+          "source" : "(((a + 50004) * (1 - q) + (a + 50004) * q) * (1 - r) + ((a + 50004) * (1 - q) + (a + 50004) * q) * r) * 1",
+          "target" : "((a + 50004) * (1 - q) + (a + 50004) * q) * (1 - r + r) * 1",
+          "verification" : 5
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "((a + 50004) * (1 - q) + (a + 50004) * q) * (1 - r + r) * 1",
+          "target" : "((a + 50004) * (1 - q) + (a + 50004) * q) * 1 * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_factor-left",
+          "schema" : null,
+          "source" : "((a + 50004) * (1 - q) + (a + 50004) * q) * 1 * 1",
+          "target" : "(a + 50004) * (1 - q + q) * 1 * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "(a + 50004) * (1 - q + q) * 1 * 1",
+          "target" : "(a + 50004) * 1 * 1 * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_multiply-one",
+          "schema" : null,
+          "source" : "(a + 50004) * 1 * 1 * 1",
+          "target" : "(a + 50004) * 1 * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_multiply-one",
+          "schema" : null,
+          "source" : "(a + 50004) * 1 * 1",
+          "target" : "(a + 50004) * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_multiply-one",
+          "schema" : null,
+          "source" : "(a + 50004) * 1",
+          "target" : "a + 50004",
+          "verification" : 3
+        } ],
+        "work" : 757
+      },
+      "routed" : 464,
+      "source" : "((((a+50004)*(1-q)+(a+50004)*q)*(1-r)+((a+50004)*(1-q)+(a+50004)*q)*r)*(1-p)+(((a+50004)*(1-q)+(a+50004)*q)*(1-r)+((a+50004)*(1-q)+(a+50004)*q)*r)*p)",
+      "target" : 3
+    }, {
+      "base" : 406,
+      "candidate" : 262,
+      "cap" : 378,
+      "depth" : 5,
+      "index" : 4,
+      "previous" : 401,
+      "reference" : {
+        "output" : "a + 50005",
+        "solved" : true,
+        "witness" : [ {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_factor-left",
+          "schema" : null,
+          "source" : "((a + 50005) * (1 - q) + (a + 50005) * q) * (1 - p) + ((a + 50005) * (1 - q) + (a + 50005) * q) * p",
+          "target" : "((a + 50005) * (1 - q) + (a + 50005) * q) * (1 - p + p)",
+          "verification" : 5
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "((a + 50005) * (1 - q) + (a + 50005) * q) * (1 - p + p)",
+          "target" : "((a + 50005) * (1 - q) + (a + 50005) * q) * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_factor-left",
+          "schema" : null,
+          "source" : "((a + 50005) * (1 - q) + (a + 50005) * q) * 1",
+          "target" : "(a + 50005) * (1 - q + q) * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "(a + 50005) * (1 - q + q) * 1",
+          "target" : "(a + 50005) * 1 * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_multiply-one",
+          "schema" : null,
+          "source" : "(a + 50005) * 1 * 1",
+          "target" : "(a + 50005) * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_multiply-one",
+          "schema" : null,
+          "source" : "(a + 50005) * 1",
+          "target" : "a + 50005",
+          "verification" : 3
+        } ],
+        "work" : 378
+      },
+      "routed" : 262,
+      "source" : "(((a+50005)*(1-q)+(a+50005)*q)*(1-p)+((a+50005)*(1-q)+(a+50005)*q)*p)",
+      "target" : 3
+    }, {
+      "base" : 470,
+      "candidate" : 332,
+      "cap" : 434,
+      "depth" : 5,
+      "index" : 5,
+      "previous" : 459,
+      "reference" : {
+        "output" : "a + 50006",
+        "solved" : true,
+        "witness" : [ {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_factor-left",
+          "schema" : null,
+          "source" : "((a + 50006) * (1 - (q + t)) + (a + 50006) * (q + t)) * (1 - (p + s)) + ((a + 50006) * (1 - (q + t)) + (a + 50006) * (q + t)) * (p + s)",
+          "target" : "((a + 50006) * (1 - (q + t)) + (a + 50006) * (q + t)) * (1 - (p + s) + (p + s))",
+          "verification" : 5
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "((a + 50006) * (1 - (q + t)) + (a + 50006) * (q + t)) * (1 - (p + s) + (p + s))",
+          "target" : "((a + 50006) * (1 - (q + t)) + (a + 50006) * (q + t)) * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_factor-left",
+          "schema" : null,
+          "source" : "((a + 50006) * (1 - (q + t)) + (a + 50006) * (q + t)) * 1",
+          "target" : "(a + 50006) * (1 - (q + t) + (q + t)) * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "(a + 50006) * (1 - (q + t) + (q + t)) * 1",
+          "target" : "(a + 50006) * 1 * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_multiply-one",
+          "schema" : null,
+          "source" : "(a + 50006) * 1 * 1",
+          "target" : "(a + 50006) * 1",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_multiply-one",
+          "schema" : null,
+          "source" : "(a + 50006) * 1",
+          "target" : "a + 50006",
+          "verification" : 3
+        } ],
+        "work" : 434
+      },
+      "routed" : 332,
+      "source" : "(((a+50006)*(1-(q+t))+(a+50006)*(q+t))*(1-(p+s))+((a+50006)*(1-(q+t))+(a+50006)*(q+t))*(p+s))",
+      "target" : 3
+    } ],
+    "load" : 4049,
+    "modelHash" : "sha256:3961f5311dde601f0f9381e212864e03ddf858b6a3a2e76f664a148cd22a7a8b",
+    "readWork" : 3118,
+    "referenceSetup" : 0,
+    "referenceWork" : 1569,
+    "stream" : "A",
+    "support" : {
+      "checked-schema:sha256:00f0a791f2e717a3d4c8c54c55c95b8c6b5ea5f00e66adaf7beb0d13d4f268a5" : [ "task-0@sha256:50516403ee39e607b4a0567536b0dd38109295e7493017dd18f6f1fc660c64b5:L[3,4,]", "task-1@sha256:d21f1420a0585273eb674dc8a086862df9c09cd9535618b90261c5885a84bf23:[1,2,]", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:L[3,4,]", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:[1,2,]" ],
+      "checked-schema:sha256:18629d66221bf0a30731e44d4fcbe2387a8d22f012fb82c0a9cbda1e415ac89e" : [ "task-0@sha256:50516403ee39e607b4a0567536b0dd38109295e7493017dd18f6f1fc660c64b5:0-9", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:0-9" ],
+      "checked-schema:sha256:376d4dd0cdf79fed0d5f414792305e3e99bd16acb32e7aab4d7b57d912ecb2f0" : [ "task-0@sha256:50516403ee39e607b4a0567536b0dd38109295e7493017dd18f6f1fc660c64b5:LL[4,5,6,]", "task-1@sha256:d21f1420a0585273eb674dc8a086862df9c09cd9535618b90261c5885a84bf23:L[2,3,4,]", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:LL[4,5,6,]" ],
+      "checked-schema:sha256:509bf2a36fdefd51a7099e99b3d9a286ef7bb78cdbcbeb0c4bf72b3727c1fdcf" : [ "task-0@sha256:50516403ee39e607b4a0567536b0dd38109295e7493017dd18f6f1fc660c64b5:L[6,7,]", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:[6,7,]" ],
+      "checked-schema:sha256:5c2a7304feee6588d4102a8f1a6eddcd2754f660711f0d0360ea7a5a4715d988" : [ "task-0@sha256:50516403ee39e607b4a0567536b0dd38109295e7493017dd18f6f1fc660c64b5:L[2,3,4,5,6,7,]", "task-1@sha256:d21f1420a0585273eb674dc8a086862df9c09cd9535618b90261c5885a84bf23:0-6", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:L[2,3,4,5,6,7,]" ],
+      "checked-schema:sha256:79eedf4b777afb3accb85094d7b2b56403e91c8e2b6eeb89817d4f13b5001a17" : [ "task-1@sha256:d21f1420a0585273eb674dc8a086862df9c09cd9535618b90261c5885a84bf23:0-6", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:L[2,3,4,5,6,7,]" ],
+      "checked-schema:sha256:91e5a97ce1471a0fdbf7184a8b6bfb14337a22d02da8e74f6c75b0a35d7d26fb" : [ "task-0@sha256:50516403ee39e607b4a0567536b0dd38109295e7493017dd18f6f1fc660c64b5:L[6,7,]", "task-1@sha256:d21f1420a0585273eb674dc8a086862df9c09cd9535618b90261c5885a84bf23:[4,5,]", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:L[6,7,]" ],
+      "checked-schema:sha256:a9a03de38d89f13cf6ac3ca20a5543696beeef82a62f62825b3bbc771615b604" : [ "task-0@sha256:50516403ee39e607b4a0567536b0dd38109295e7493017dd18f6f1fc660c64b5:L[2,3,]", "task-1@sha256:d21f1420a0585273eb674dc8a086862df9c09cd9535618b90261c5885a84bf23:L[2,3,]", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:LL[4,5,]" ],
+      "checked-schema:sha256:af134a58b64b207634f2178f5c46a7d2bb40a4483f47c7a0df6f8c02f0430dd0" : [ "task-0@sha256:50516403ee39e607b4a0567536b0dd38109295e7493017dd18f6f1fc660c64b5:L[5,6,]", "task-1@sha256:d21f1420a0585273eb674dc8a086862df9c09cd9535618b90261c5885a84bf23:[3,4,]", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:L[5,6,]" ],
+      "checked-schema:sha256:c242dd954261b32d2e94dca16d265ac281540900d876430e1f002ebf4dbe14c7" : [ "task-0@sha256:50516403ee39e607b4a0567536b0dd38109295e7493017dd18f6f1fc660c64b5:L[2,3,]", "task-1@sha256:d21f1420a0585273eb674dc8a086862df9c09cd9535618b90261c5885a84bf23:[0,1,]", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:L[2,3,]", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:[0,1,]" ],
+      "checked-schema:sha256:ec6951d3a1e685ba02727364e74302665fc0aa858a1c2d205f028b346fe0b630" : [ "task-0@sha256:50516403ee39e607b4a0567536b0dd38109295e7493017dd18f6f1fc660c64b5:L[4,5,]", "task-1@sha256:d21f1420a0585273eb674dc8a086862df9c09cd9535618b90261c5885a84bf23:[2,3,]", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:L[4,5,]", "task-2@sha256:173a3eedc9bf45000288b0ce20e53337097a9e6922c0b040ceac650d0e127f0e:[2,3,]" ]
+    },
+    "training" : [ {
+      "index" : 0,
+      "output" : "a + 50001",
+      "solved" : true,
+      "source" : "((((a+50001)*(1-q)+(a+50001)*q)*(1-r)+((a+50001)*(1-q)+(a+50001)*q)*r)*(1-p)+(((a+50001)*(1-q)+(a+50001)*q)*(1-r)+((a+50001)*(1-q)+(a+50001)*q)*r)*p)",
+      "target" : 3,
+      "witness" : [ {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_factor-left",
+        "schema" : null,
+        "source" : "(((a + 50001) * (1 - q) + (a + 50001) * q) * (1 - r) + ((a + 50001) * (1 - q) + (a + 50001) * q) * r) * (1 - p) + (((a + 50001) * (1 - q) + (a + 50001) * q) * (1 - r) + ((a + 50001) * (1 - q) + (a + 50001) * q) * r) * p",
+        "target" : "(((a + 50001) * (1 - q) + (a + 50001) * q) * (1 - r) + ((a + 50001) * (1 - q) + (a + 50001) * q) * r) * (1 - p + p)",
+        "verification" : 9
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "(((a + 50001) * (1 - q) + (a + 50001) * q) * (1 - r) + ((a + 50001) * (1 - q) + (a + 50001) * q) * r) * (1 - p + p)",
+        "target" : "(((a + 50001) * (1 - q) + (a + 50001) * q) * (1 - r) + ((a + 50001) * (1 - q) + (a + 50001) * q) * r) * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_factor-left",
+        "schema" : null,
+        "source" : "(((a + 50001) * (1 - q) + (a + 50001) * q) * (1 - r) + ((a + 50001) * (1 - q) + (a + 50001) * q) * r) * 1",
+        "target" : "((a + 50001) * (1 - q) + (a + 50001) * q) * (1 - r + r) * 1",
+        "verification" : 5
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "((a + 50001) * (1 - q) + (a + 50001) * q) * (1 - r + r) * 1",
+        "target" : "((a + 50001) * (1 - q) + (a + 50001) * q) * 1 * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_factor-left",
+        "schema" : null,
+        "source" : "((a + 50001) * (1 - q) + (a + 50001) * q) * 1 * 1",
+        "target" : "(a + 50001) * (1 - q + q) * 1 * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "(a + 50001) * (1 - q + q) * 1 * 1",
+        "target" : "(a + 50001) * 1 * 1 * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_multiply-one",
+        "schema" : null,
+        "source" : "(a + 50001) * 1 * 1 * 1",
+        "target" : "(a + 50001) * 1 * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_multiply-one",
+        "schema" : null,
+        "source" : "(a + 50001) * 1 * 1",
+        "target" : "(a + 50001) * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_multiply-one",
+        "schema" : null,
+        "source" : "(a + 50001) * 1",
+        "target" : "a + 50001",
+        "verification" : 3
+      } ],
+      "work" : 757
+    }, {
+      "index" : 1,
+      "output" : "a + 50002",
+      "solved" : true,
+      "source" : "(((a+50002)*(1-(p+s))+(a+50002)*(p+s))*(1-(q+t))+((a+50002)*(1-(p+s))+(a+50002)*(p+s))*(q+t))",
+      "target" : 3,
+      "witness" : [ {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_factor-left",
+        "schema" : null,
+        "source" : "((a + 50002) * (1 - (p + s)) + (a + 50002) * (p + s)) * (1 - (q + t)) + ((a + 50002) * (1 - (p + s)) + (a + 50002) * (p + s)) * (q + t)",
+        "target" : "((a + 50002) * (1 - (p + s)) + (a + 50002) * (p + s)) * (1 - (q + t) + (q + t))",
+        "verification" : 5
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "((a + 50002) * (1 - (p + s)) + (a + 50002) * (p + s)) * (1 - (q + t) + (q + t))",
+        "target" : "((a + 50002) * (1 - (p + s)) + (a + 50002) * (p + s)) * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_factor-left",
+        "schema" : null,
+        "source" : "((a + 50002) * (1 - (p + s)) + (a + 50002) * (p + s)) * 1",
+        "target" : "(a + 50002) * (1 - (p + s) + (p + s)) * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "(a + 50002) * (1 - (p + s) + (p + s)) * 1",
+        "target" : "(a + 50002) * 1 * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_multiply-one",
+        "schema" : null,
+        "source" : "(a + 50002) * 1 * 1",
+        "target" : "(a + 50002) * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_multiply-one",
+        "schema" : null,
+        "source" : "(a + 50002) * 1",
+        "target" : "a + 50002",
+        "verification" : 3
+      } ],
+      "work" : 434
+    }, {
+      "index" : 2,
+      "output" : "a + 50003",
+      "solved" : true,
+      "source" : "((((a+50003)*(1-(p+s))+(a+50003)*(p+s))*(1-(q+t))+((a+50003)*(1-(p+s))+(a+50003)*(p+s))*(q+t))*(1-(r+u))+(((a+50003)*(1-(p+s))+(a+50003)*(p+s))*(1-(q+t))+((a+50003)*(1-(p+s))+(a+50003)*(p+s))*(q+t))*(r+u))",
+      "target" : 3,
+      "witness" : [ {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_factor-left",
+        "schema" : null,
+        "source" : "(((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (1 - (q + t)) + ((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (q + t)) * (1 - (r + u)) + (((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (1 - (q + t)) + ((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (q + t)) * (r + u)",
+        "target" : "(((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (1 - (q + t)) + ((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (q + t)) * (1 - (r + u) + (r + u))",
+        "verification" : 9
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "(((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (1 - (q + t)) + ((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (q + t)) * (1 - (r + u) + (r + u))",
+        "target" : "(((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (1 - (q + t)) + ((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (q + t)) * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_factor-left",
+        "schema" : null,
+        "source" : "(((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (1 - (q + t)) + ((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (q + t)) * 1",
+        "target" : "((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (1 - (q + t) + (q + t)) * 1",
+        "verification" : 5
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * (1 - (q + t) + (q + t)) * 1",
+        "target" : "((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * 1 * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_factor-left",
+        "schema" : null,
+        "source" : "((a + 50003) * (1 - (p + s)) + (a + 50003) * (p + s)) * 1 * 1",
+        "target" : "(a + 50003) * (1 - (p + s) + (p + s)) * 1 * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "(a + 50003) * (1 - (p + s) + (p + s)) * 1 * 1",
+        "target" : "(a + 50003) * 1 * 1 * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_multiply-one",
+        "schema" : null,
+        "source" : "(a + 50003) * 1 * 1 * 1",
+        "target" : "(a + 50003) * 1 * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_multiply-one",
+        "schema" : null,
+        "source" : "(a + 50003) * 1 * 1",
+        "target" : "(a + 50003) * 1",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_multiply-one",
+        "schema" : null,
+        "source" : "(a + 50003) * 1",
+        "target" : "a + 50003",
+        "verification" : 3
+      } ],
+      "work" : 901
+    } ]
+  }, {
+    "acquisition" : {
+      "lessons" : 1853,
+      "formation" : 10314,
+      "preparation" : 710,
+      "validation" : 7054,
+      "selection" : 35,
+      "restoration" : 0,
+      "splitChecking" : 1264
+    },
+    "decision" : "PROMOTED",
+    "gates" : [ {
+      "base" : 945,
+      "candidate" : 1017,
+      "cap" : 905,
+      "depth" : 8,
+      "index" : 3,
+      "previous" : 956,
+      "reference" : {
+        "output" : "b ^ 2 + d ^ 2 + (c + 60004) ^ 2",
+        "solved" : true,
+        "witness" : [ {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_difference-product",
+          "schema" : null,
+          "source" : "(b + e) * (b - e) + e * e + ((d + g) * (d - g) + g * g) + ((c + 60004 + f) * (c + 60004 - f) + f * f)",
+          "target" : "b ^ 2 - e ^ 2 + e * e + ((d + g) * (d - g) + g * g) + ((c + 60004 + f) * (c + 60004 - f) + f * f)",
+          "verification" : 5
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_difference-product",
+          "schema" : null,
+          "source" : "b ^ 2 - e ^ 2 + e * e + ((d + g) * (d - g) + g * g) + ((c + 60004 + f) * (c + 60004 - f) + f * f)",
+          "target" : "b ^ 2 - e ^ 2 + e * e + (d ^ 2 - g ^ 2 + g * g) + ((c + 60004 + f) * (c + 60004 - f) + f * f)",
+          "verification" : 4
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_difference-product",
+          "schema" : null,
+          "source" : "b ^ 2 - e ^ 2 + e * e + (d ^ 2 - g ^ 2 + g * g) + ((c + 60004 + f) * (c + 60004 - f) + f * f)",
+          "target" : "b ^ 2 - e ^ 2 + e * e + (d ^ 2 - g ^ 2 + g * g) + ((c + 60004) ^ 2 - f ^ 2 + f * f)",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_square-product",
+          "schema" : null,
+          "source" : "b ^ 2 - e ^ 2 + e * e + (d ^ 2 - g ^ 2 + g * g) + ((c + 60004) ^ 2 - f ^ 2 + f * f)",
+          "target" : "b ^ 2 - e ^ 2 + e ^ 2 + (d ^ 2 - g ^ 2 + g * g) + ((c + 60004) ^ 2 - f ^ 2 + f * f)",
+          "verification" : 5
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "b ^ 2 - e ^ 2 + e ^ 2 + (d ^ 2 - g ^ 2 + g * g) + ((c + 60004) ^ 2 - f ^ 2 + f * f)",
+          "target" : "b ^ 2 + (d ^ 2 - g ^ 2 + g * g) + ((c + 60004) ^ 2 - f ^ 2 + f * f)",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_square-product",
+          "schema" : null,
+          "source" : "b ^ 2 + (d ^ 2 - g ^ 2 + g * g) + ((c + 60004) ^ 2 - f ^ 2 + f * f)",
+          "target" : "b ^ 2 + (d ^ 2 - g ^ 2 + g ^ 2) + ((c + 60004) ^ 2 - f ^ 2 + f * f)",
+          "verification" : 4
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "b ^ 2 + (d ^ 2 - g ^ 2 + g ^ 2) + ((c + 60004) ^ 2 - f ^ 2 + f * f)",
+          "target" : "b ^ 2 + d ^ 2 + ((c + 60004) ^ 2 - f ^ 2 + f * f)",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_square-product",
+          "schema" : null,
+          "source" : "b ^ 2 + d ^ 2 + ((c + 60004) ^ 2 - f ^ 2 + f * f)",
+          "target" : "b ^ 2 + d ^ 2 + ((c + 60004) ^ 2 - f ^ 2 + f ^ 2)",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "b ^ 2 + d ^ 2 + ((c + 60004) ^ 2 - f ^ 2 + f ^ 2)",
+          "target" : "b ^ 2 + d ^ 2 + (c + 60004) ^ 2",
+          "verification" : 3
+        } ],
+        "work" : 905
+      },
+      "routed" : 958,
+      "source" : "((b+e)*(b-e)+e*e)+((d+g)*(d-g)+g*g)+(((c+60004)+f)*((c+60004)-f)+f*f)",
+      "target" : 13
+    }, {
+      "base" : 518,
+      "candidate" : 282,
+      "cap" : 478,
+      "depth" : 5,
+      "index" : 4,
+      "previous" : 507,
+      "reference" : {
+        "output" : "(b + 60005) ^ 2 + c ^ 2",
+        "solved" : true,
+        "witness" : [ {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_difference-product",
+          "schema" : null,
+          "source" : "(b + 60005 + e) * (b + 60005 - e) + e * e + ((c + f) * (c - f) + f * f)",
+          "target" : "(b + 60005) ^ 2 - e ^ 2 + e * e + ((c + f) * (c - f) + f * f)",
+          "verification" : 4
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_difference-product",
+          "schema" : null,
+          "source" : "(b + 60005) ^ 2 - e ^ 2 + e * e + ((c + f) * (c - f) + f * f)",
+          "target" : "(b + 60005) ^ 2 - e ^ 2 + e * e + (c ^ 2 - f ^ 2 + f * f)",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_square-product",
+          "schema" : null,
+          "source" : "(b + 60005) ^ 2 - e ^ 2 + e * e + (c ^ 2 - f ^ 2 + f * f)",
+          "target" : "(b + 60005) ^ 2 - e ^ 2 + e ^ 2 + (c ^ 2 - f ^ 2 + f * f)",
+          "verification" : 4
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "(b + 60005) ^ 2 - e ^ 2 + e ^ 2 + (c ^ 2 - f ^ 2 + f * f)",
+          "target" : "(b + 60005) ^ 2 + (c ^ 2 - f ^ 2 + f * f)",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_square-product",
+          "schema" : null,
+          "source" : "(b + 60005) ^ 2 + (c ^ 2 - f ^ 2 + f * f)",
+          "target" : "(b + 60005) ^ 2 + (c ^ 2 - f ^ 2 + f ^ 2)",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "(b + 60005) ^ 2 + (c ^ 2 - f ^ 2 + f ^ 2)",
+          "target" : "(b + 60005) ^ 2 + c ^ 2",
+          "verification" : 3
+        } ],
+        "work" : 478
+      },
+      "routed" : 282,
+      "source" : "(((b+60005)+e)*((b+60005)-e)+e*e)+((c+f)*(c-f)+f*f)",
+      "target" : 9
+    }, {
+      "base" : 518,
+      "candidate" : 282,
+      "cap" : 478,
+      "depth" : 5,
+      "index" : 5,
+      "previous" : 507,
+      "reference" : {
+        "output" : "(b + 60006) ^ 2 + c ^ 2",
+        "solved" : true,
+        "witness" : [ {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_difference-product",
+          "schema" : null,
+          "source" : "(b + 60006 + e) * (b + 60006 - e) + e * e + ((c + f) * (c - f) + f * f)",
+          "target" : "(b + 60006) ^ 2 - e ^ 2 + e * e + ((c + f) * (c - f) + f * f)",
+          "verification" : 4
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_difference-product",
+          "schema" : null,
+          "source" : "(b + 60006) ^ 2 - e ^ 2 + e * e + ((c + f) * (c - f) + f * f)",
+          "target" : "(b + 60006) ^ 2 - e ^ 2 + e * e + (c ^ 2 - f ^ 2 + f * f)",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_square-product",
+          "schema" : null,
+          "source" : "(b + 60006) ^ 2 - e ^ 2 + e * e + (c ^ 2 - f ^ 2 + f * f)",
+          "target" : "(b + 60006) ^ 2 - e ^ 2 + e ^ 2 + (c ^ 2 - f ^ 2 + f * f)",
+          "verification" : 4
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "(b + 60006) ^ 2 - e ^ 2 + e ^ 2 + (c ^ 2 - f ^ 2 + f * f)",
+          "target" : "(b + 60006) ^ 2 + (c ^ 2 - f ^ 2 + f * f)",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_square-product",
+          "schema" : null,
+          "source" : "(b + 60006) ^ 2 + (c ^ 2 - f ^ 2 + f * f)",
+          "target" : "(b + 60006) ^ 2 + (c ^ 2 - f ^ 2 + f ^ 2)",
+          "verification" : 3
+        }, {
+          "evidence" : null,
+          "rule" : "evo_3601297f9f7d_cancel-addend",
+          "schema" : null,
+          "source" : "(b + 60006) ^ 2 + (c ^ 2 - f ^ 2 + f ^ 2)",
+          "target" : "(b + 60006) ^ 2 + c ^ 2",
+          "verification" : 3
+        } ],
+        "work" : 478
+      },
+      "routed" : 282,
+      "source" : "(((b+60006)+e)*((b+60006)-e)+e*e)+((c+f)*(c-f)+f*f)",
+      "target" : 9
+    } ],
+    "load" : 1108,
+    "modelHash" : "sha256:6ad2d47e981740a1ca46106abdb77c770fe4172e3f82037f50e97fe6ee5c0f7c",
+    "readWork" : 2840,
+    "referenceSetup" : 0,
+    "referenceWork" : 1861,
+    "stream" : "B",
+    "support" : {
+      "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d" : [ "task-0@sha256:53a648dda5cf4996ffc889a328b55fa0033f62c2ba6de8b73b0d6eeee0181c27:LL[0,3,4,]", "task-0@sha256:53a648dda5cf4996ffc889a328b55fa0033f62c2ba6de8b73b0d6eeee0181c27:LR[1,5,6,]", "task-1@sha256:7847aa2c7491db96067fb7d7d781df12d0a3c0d4256fd7f0783f80634ba975cf:L[0,2,3,]", "task-1@sha256:7847aa2c7491db96067fb7d7d781df12d0a3c0d4256fd7f0783f80634ba975cf:R[1,4,5,]", "task-2@sha256:bf95e5704ec7984f8278c79347fc03ef9102f3f2825c4b7a6ee801275593f405:R[1,4,5,]" ],
+      "checked-schema:sha256:154dd85009fe709767df3f80d1a8c0121348cee1e126b3472162d88d9726c107" : [ "task-0@sha256:53a648dda5cf4996ffc889a328b55fa0033f62c2ba6de8b73b0d6eeee0181c27:L[0,1,3,4,5,6,]", "task-1@sha256:7847aa2c7491db96067fb7d7d781df12d0a3c0d4256fd7f0783f80634ba975cf:0-6", "task-2@sha256:bf95e5704ec7984f8278c79347fc03ef9102f3f2825c4b7a6ee801275593f405:0-6" ],
+      "checked-schema:sha256:d6b15c1d38636787b804f361fa889607eef9c77a779200b5df5c3fb341d04afc" : [ "task-0@sha256:53a648dda5cf4996ffc889a328b55fa0033f62c2ba6de8b73b0d6eeee0181c27:LL[0,3,4,]", "task-1@sha256:7847aa2c7491db96067fb7d7d781df12d0a3c0d4256fd7f0783f80634ba975cf:L[0,2,3,]", "task-2@sha256:bf95e5704ec7984f8278c79347fc03ef9102f3f2825c4b7a6ee801275593f405:L[0,2,3,]" ]
+    },
+    "training" : [ {
+      "index" : 0,
+      "output" : "(c + 60001) ^ 2 + b ^ 2 + d ^ 2",
+      "solved" : true,
+      "source" : "(((c+60001)+f)*((c+60001)-f)+f*f)+((b+e)*(b-e)+e*e)+((d+g)*(d-g)+g*g)",
+      "target" : 13,
+      "witness" : [ {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_difference-product",
+        "schema" : null,
+        "source" : "(c + 60001 + f) * (c + 60001 - f) + f * f + ((b + e) * (b - e) + e * e) + ((d + g) * (d - g) + g * g)",
+        "target" : "(c + 60001) ^ 2 - f ^ 2 + f * f + ((b + e) * (b - e) + e * e) + ((d + g) * (d - g) + g * g)",
+        "verification" : 5
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_difference-product",
+        "schema" : null,
+        "source" : "(c + 60001) ^ 2 - f ^ 2 + f * f + ((b + e) * (b - e) + e * e) + ((d + g) * (d - g) + g * g)",
+        "target" : "(c + 60001) ^ 2 - f ^ 2 + f * f + (b ^ 2 - e ^ 2 + e * e) + ((d + g) * (d - g) + g * g)",
+        "verification" : 4
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_difference-product",
+        "schema" : null,
+        "source" : "(c + 60001) ^ 2 - f ^ 2 + f * f + (b ^ 2 - e ^ 2 + e * e) + ((d + g) * (d - g) + g * g)",
+        "target" : "(c + 60001) ^ 2 - f ^ 2 + f * f + (b ^ 2 - e ^ 2 + e * e) + (d ^ 2 - g ^ 2 + g * g)",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_square-product",
+        "schema" : null,
+        "source" : "(c + 60001) ^ 2 - f ^ 2 + f * f + (b ^ 2 - e ^ 2 + e * e) + (d ^ 2 - g ^ 2 + g * g)",
+        "target" : "(c + 60001) ^ 2 - f ^ 2 + f ^ 2 + (b ^ 2 - e ^ 2 + e * e) + (d ^ 2 - g ^ 2 + g * g)",
+        "verification" : 5
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "(c + 60001) ^ 2 - f ^ 2 + f ^ 2 + (b ^ 2 - e ^ 2 + e * e) + (d ^ 2 - g ^ 2 + g * g)",
+        "target" : "(c + 60001) ^ 2 + (b ^ 2 - e ^ 2 + e * e) + (d ^ 2 - g ^ 2 + g * g)",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_square-product",
+        "schema" : null,
+        "source" : "(c + 60001) ^ 2 + (b ^ 2 - e ^ 2 + e * e) + (d ^ 2 - g ^ 2 + g * g)",
+        "target" : "(c + 60001) ^ 2 + (b ^ 2 - e ^ 2 + e ^ 2) + (d ^ 2 - g ^ 2 + g * g)",
+        "verification" : 4
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "(c + 60001) ^ 2 + (b ^ 2 - e ^ 2 + e ^ 2) + (d ^ 2 - g ^ 2 + g * g)",
+        "target" : "(c + 60001) ^ 2 + b ^ 2 + (d ^ 2 - g ^ 2 + g * g)",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_square-product",
+        "schema" : null,
+        "source" : "(c + 60001) ^ 2 + b ^ 2 + (d ^ 2 - g ^ 2 + g * g)",
+        "target" : "(c + 60001) ^ 2 + b ^ 2 + (d ^ 2 - g ^ 2 + g ^ 2)",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "(c + 60001) ^ 2 + b ^ 2 + (d ^ 2 - g ^ 2 + g ^ 2)",
+        "target" : "(c + 60001) ^ 2 + b ^ 2 + d ^ 2",
+        "verification" : 3
+      } ],
+      "work" : 897
+    }, {
+      "index" : 1,
+      "output" : "(c + 60002) ^ 2 + b ^ 2",
+      "solved" : true,
+      "source" : "(((c+60002)+f)*((c+60002)-f)+f*f)+((b+e)*(b-e)+e*e)",
+      "target" : 9,
+      "witness" : [ {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_difference-product",
+        "schema" : null,
+        "source" : "(c + 60002 + f) * (c + 60002 - f) + f * f + ((b + e) * (b - e) + e * e)",
+        "target" : "(c + 60002) ^ 2 - f ^ 2 + f * f + ((b + e) * (b - e) + e * e)",
+        "verification" : 4
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_difference-product",
+        "schema" : null,
+        "source" : "(c + 60002) ^ 2 - f ^ 2 + f * f + ((b + e) * (b - e) + e * e)",
+        "target" : "(c + 60002) ^ 2 - f ^ 2 + f * f + (b ^ 2 - e ^ 2 + e * e)",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_square-product",
+        "schema" : null,
+        "source" : "(c + 60002) ^ 2 - f ^ 2 + f * f + (b ^ 2 - e ^ 2 + e * e)",
+        "target" : "(c + 60002) ^ 2 - f ^ 2 + f ^ 2 + (b ^ 2 - e ^ 2 + e * e)",
+        "verification" : 4
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "(c + 60002) ^ 2 - f ^ 2 + f ^ 2 + (b ^ 2 - e ^ 2 + e * e)",
+        "target" : "(c + 60002) ^ 2 + (b ^ 2 - e ^ 2 + e * e)",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_square-product",
+        "schema" : null,
+        "source" : "(c + 60002) ^ 2 + (b ^ 2 - e ^ 2 + e * e)",
+        "target" : "(c + 60002) ^ 2 + (b ^ 2 - e ^ 2 + e ^ 2)",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "(c + 60002) ^ 2 + (b ^ 2 - e ^ 2 + e ^ 2)",
+        "target" : "(c + 60002) ^ 2 + b ^ 2",
+        "verification" : 3
+      } ],
+      "work" : 478
+    }, {
+      "index" : 2,
+      "output" : "(c + 60003) ^ 2 + b ^ 2",
+      "solved" : true,
+      "source" : "(((c+60003)+f)*((c+60003)-f)+f*f)+((b+e)*(b-e)+e*e)",
+      "target" : 9,
+      "witness" : [ {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_difference-product",
+        "schema" : null,
+        "source" : "(c + 60003 + f) * (c + 60003 - f) + f * f + ((b + e) * (b - e) + e * e)",
+        "target" : "(c + 60003) ^ 2 - f ^ 2 + f * f + ((b + e) * (b - e) + e * e)",
+        "verification" : 4
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_difference-product",
+        "schema" : null,
+        "source" : "(c + 60003) ^ 2 - f ^ 2 + f * f + ((b + e) * (b - e) + e * e)",
+        "target" : "(c + 60003) ^ 2 - f ^ 2 + f * f + (b ^ 2 - e ^ 2 + e * e)",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_square-product",
+        "schema" : null,
+        "source" : "(c + 60003) ^ 2 - f ^ 2 + f * f + (b ^ 2 - e ^ 2 + e * e)",
+        "target" : "(c + 60003) ^ 2 - f ^ 2 + f ^ 2 + (b ^ 2 - e ^ 2 + e * e)",
+        "verification" : 4
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "(c + 60003) ^ 2 - f ^ 2 + f ^ 2 + (b ^ 2 - e ^ 2 + e * e)",
+        "target" : "(c + 60003) ^ 2 + (b ^ 2 - e ^ 2 + e * e)",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_square-product",
+        "schema" : null,
+        "source" : "(c + 60003) ^ 2 + (b ^ 2 - e ^ 2 + e * e)",
+        "target" : "(c + 60003) ^ 2 + (b ^ 2 - e ^ 2 + e ^ 2)",
+        "verification" : 3
+      }, {
+        "evidence" : null,
+        "rule" : "evo_3601297f9f7d_cancel-addend",
+        "schema" : null,
+        "source" : "(c + 60003) ^ 2 + (b ^ 2 - e ^ 2 + e ^ 2)",
+        "target" : "(c + 60003) ^ 2 + b ^ 2",
+        "verification" : 3
+      } ],
+      "work" : 478
+    } ]
+  } ],
+  "joinWork" : 12444,
+  "load" : 5157
+}

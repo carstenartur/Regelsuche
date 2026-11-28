@@ -36,7 +36,9 @@ class PairedTacticStudyTest {
     record Setup(long acquisition, long calibration, long load, long preparation) {
         long total() { return Math.addExact(Math.addExact(acquisition, calibration), Math.addExact(load, preparation)); }
     }
-    record Sample(long selection, TypedSourceOnlySearch.Result evidence) {}
+    record Sample(long selection, TypedSourceOnlySearch.Result evidence, Boolean admitted) {
+        Sample(long selection, TypedSourceOnlySearch.Result evidence) { this(selection, evidence, null); }
+    }
     interface Query { Sample solve(CheckedSchemaTaskSolver.Task task); }
     record Engine(Query query, Setup setup) {}
     record Library(String snapshot, long acquisition) {
@@ -113,7 +115,7 @@ class PairedTacticStudyTest {
         writeJson(out.resolve("fit.json"), new FitReceipt(fit.policy().fingerprint(), fit.work(), fit.trials()));
     }
 
-    private static Materials readMaterials(Path research, Path training) throws IOException {
+    static Materials readMaterials(Path research, Path training) throws IOException {
         var earlier = HornerTransferStudyTest.readFrozenInputs(research);
         var manifest = JSON.readTree(Files.readString(training.resolve("training.json")));
         if (!PROTOCOL.equals(manifest.required("protocol").asText()) || !INVENTORY.contentHash().equals(manifest.required("inventory").asText()))
@@ -125,7 +127,7 @@ class PairedTacticStudyTest {
             JSON.readValue(Files.readString(training.resolve("fit.json")), FitReceipt.class));
     }
 
-    private static Engine engine(Arm arm, Materials materials, Set<String> disabled) {
+    static Engine engine(Arm arm, Materials materials, Set<String> disabled) {
         var inventory = TypedLearnedMoveInventory.primitives(INVENTORY);
         if (arm == Arm.BASE) {
             var solver = inventory.newTaskSolver();
@@ -226,7 +228,7 @@ class PairedTacticStudyTest {
             binding == null ? null : binding.evidenceHash(), step.verification().work());
     }
 
-    private static Row run(Engine engine, PairedTacticCases.Input input, long clock, Map<String,List<Step>> paths) throws IOException {
+    static Row run(Engine engine, PairedTacticCases.Input input, long clock, Map<String,List<Step>> paths) throws IOException {
         var sample = engine.query().solve(input.task());
         var result = sample.evidence();
         if (!result.accountingComplete()) throw new IllegalStateException("incomplete accounting");
@@ -246,7 +248,7 @@ class PairedTacticStudyTest {
             hash, steps.stream().map(Step::schema).filter(java.util.Objects::nonNull).distinct().sorted().toList());
     }
 
-    private static void writeLines(Path path, List<?> records) throws IOException {
+    static void writeLines(Path path, List<?> records) throws IOException {
         try (var writer = Files.newBufferedWriter(path, StandardOpenOption.CREATE_NEW)) {
             for (var record : records) {
                 writer.write(JSON.writeValueAsString(record));

@@ -1,0 +1,5 @@
+# Additional technical reference fixed before FINAL
+
+On the three public development panels, the OLD_ONLY control reached 752, 384 and 384 timely solutions respectively, with zero learned steps in the returned paths. That result motivated a direct comparison between ordinary primitive search and primitive search which shares an immutable expression's native node count between state evaluation and the goal test. Neither control acquires, loads or selects any tactics. Misses and cache hits are metered. The independent terminal replay and polynomial audit are retained.
+
+Evaluate both controls on the same individual cases and cold deadlines used by the study on MIXED, A, B, C and D. Reuse the official final case ledgers for C and D, run in opposite orders in two JVMs, and publish all counts including regressions. Data from these two diagnostic controls do not alter the ten preregistered arms or the primary decision. They quantify the size of the general search optimization available to users independently of training. The matched RETAINED/DROP_ALL comparison measures the effect of actually offering retained rules with admission and setup held fixed.

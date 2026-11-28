@@ -241,6 +241,14 @@ public final class CumulativeTaskKnowledge {
     public int generation() { return generation; }
     public String parentId() { return parentId; }
     public int schemaCount() { return model.schemas().size(); }
+
+    /** Retain checked arithmetic schemata from another independently acquired generation.
+     * The returned model is an opt-in candidate for a new solver. Both existing generations
+     * keep their learned routes, recurrence laws and acquisition bills. */
+    public CheckedLearnedSchemaModel.Retention retainSchemasWith(CumulativeTaskKnowledge independentlyAcquired) {
+        return model.retainWith(Objects.requireNonNull(independentlyAcquired).model);
+    }
+
     public long acquisitionWork() { return acquisition.total(); }
     public Costs acquisitionCosts() { return acquisition; }
     public long sessionSetupWork() { return sessionSetup.total(); }

@@ -1,0 +1,154 @@
+{
+  "C": {
+    "newLocalSolved": {
+      "index": 3,
+      "source": "((a+70004)*(e-j)+(a+70004)*j)*(b*(f-k)+b*k)",
+      "cap": 256,
+      "output": "(a + 70004) * e * (b * f)",
+      "comparisons": {
+        "BASE": {
+          "solved": false,
+          "score": 9,
+          "cost": 275
+        },
+        "AUTO_OLD": {
+          "solved": false,
+          "score": 9,
+          "cost": 277
+        },
+        "CHECKED_OLD": {
+          "solved": false,
+          "score": 15,
+          "cost": 355
+        },
+        "PREVIOUS_POLICY": {
+          "solved": false,
+          "score": 19,
+          "cost": 264
+        },
+        "FRESH_ONLY": {
+          "solved": true,
+          "score": 9,
+          "cost": 224
+        },
+        "OLD_ONLY": {
+          "solved": true,
+          "score": 9,
+          "cost": 218
+        },
+        "PRIOR_UNION": {
+          "solved": true,
+          "score": 9,
+          "cost": 224
+        },
+        "RETAINED_FORCED": {
+          "solved": false,
+          "score": 15,
+          "cost": 315
+        },
+        "RETAINED": {
+          "solved": true,
+          "score": 9,
+          "cost": 224
+        },
+        "DROP_ALL": {
+          "solved": true,
+          "score": 9,
+          "cost": 224
+        }
+      },
+      "sequence": [
+        {
+          "rule": "evo_3601297f9f7d_factor-left",
+          "schema": null
+        },
+        {
+          "rule": "evo_3601297f9f7d_cancel-addend",
+          "schema": null
+        },
+        {
+          "rule": "evo_3601297f9f7d_factor-left",
+          "schema": null
+        },
+        {
+          "rule": "evo_3601297f9f7d_cancel-addend",
+          "schema": null
+        }
+      ]
+    }
+  },
+  "D": {
+    "newLocalSolved": {
+      "index": 4,
+      "source": "((e*a+j*a)*(f*(b+90005)+k*(b+90005)))-(r*(h*d+m*d))",
+      "cap": 256,
+      "output": "(e + j) * a * ((f + k) * (b + 90005)) - r * ((h + m) * d)",
+      "comparisons": {
+        "BASE": {
+          "solved": false,
+          "score": 23,
+          "cost": 286
+        },
+        "AUTO_OLD": {
+          "solved": false,
+          "score": 23,
+          "cost": 288
+        },
+        "CHECKED_OLD": {
+          "solved": false,
+          "score": 29,
+          "cost": 277
+        },
+        "PREVIOUS_POLICY": {
+          "solved": false,
+          "score": 29,
+          "cost": 266
+        },
+        "FRESH_ONLY": {
+          "solved": true,
+          "score": 21,
+          "cost": 238
+        },
+        "OLD_ONLY": {
+          "solved": true,
+          "score": 21,
+          "cost": 232
+        },
+        "PRIOR_UNION": {
+          "solved": true,
+          "score": 21,
+          "cost": 238
+        },
+        "RETAINED_FORCED": {
+          "solved": false,
+          "score": 29,
+          "cost": 258
+        },
+        "RETAINED": {
+          "solved": true,
+          "score": 21,
+          "cost": 238
+        },
+        "DROP_ALL": {
+          "solved": true,
+          "score": 21,
+          "cost": 238
+        }
+      },
+      "sequence": [
+        {
+          "rule": "evo_3601297f9f7d_factor-right",
+          "schema": null
+        },
+        {
+          "rule": "evo_3601297f9f7d_factor-right",
+          "schema": null
+        },
+        {
+          "rule": "evo_3601297f9f7d_factor-right",
+          "schema": null
+        }
+      ]
+    }
+  }
+}

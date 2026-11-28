@@ -40,18 +40,24 @@ final class HornerTransferCases {
     private record Stratum(Topology topology, int count) {}
 
     static List<Input> mixedPanel(String seed) {
+        return mixedBlocks(seed, 0, 128);
+    }
+
+    static List<Input> mixedBlocks(String seed, int firstBlock, int blockCount) {
+        if (firstBlock < 0 || blockCount < 0 || firstBlock + blockCount > 128)
+            throw new IllegalArgumentException("invalid development block range");
         if (!seed.matches("[0-9a-f]{40}")) throw new IllegalArgumentException("expected the full freeze commit SHA");
         var inputs = new ArrayList<Input>();
         var strata = new ArrayList<Stratum>();
         for (Topology topology : Topology.values()) {
             for (int count = 0; count < 4; count++) strata.add(new Stratum(topology, count));
         }
-        for (int block = 0; block < 128; block++) {
+        for (int block = firstBlock; block < firstBlock + blockCount; block++) {
             String prefix = seed + "/order/" + block + "/";
             Comparator<Stratum> digest = Comparator.comparing(s -> SchematicProofPlan.hash(prefix + s.topology() + "/" + s.count()));
             var ordered = strata.stream().sorted(digest.thenComparing(s -> s.topology().name()).thenComparingInt(Stratum::count)).toList();
             for (var stratum : ordered) {
-                int index = inputs.size();
+                int index = 8 * firstBlock + inputs.size();
                 inputs.add(input(seed, index, stratum.count(), 10_001 + index, stratum.topology()));
             }
         }

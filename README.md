@@ -280,6 +280,16 @@ erreichte **352** und **320**. In keiner der neuen Beweisketten kam eine der
 sechs frisch erlernten Taktiken zum Einsatz.
 [Versuch, Einzelbeispiele und unabhängige Prüfung](docs/research/prospective-tactic-transfer/README.md)
 
+Eine primitive Suche mit `solveWithSharedNodeCounts(task)` bezahlt die Größe
+eines unveränderten Ausdrucks einmal für Zustandsbewertung und Zielprüfung.
+Auf dem Horner-/Skalarproduktstrom kamen **861 statt 642** Lösungen ins Budget.
+Bei zwei neuen Familien stieg die Zahl von **352 auf 384** und von **448 auf
+480**. Die aus früheren Beweisen gewonnenen 14 Regeln kosteten mit engeren
+Prüfbudgets **41,8 % weniger** im Erwerb. Die gelernte Auswahl schaltete bei
+keiner der 1.024 neuen Aufgaben den Regelmatcher ein. Sie erreichte **379 und
+480** rechtzeitige Lösungen.
+[Regelherkunft, zehn Vergleichsverfahren und eigenständige primitive Referenz](docs/research/prospective-retained-tactics/README.md)
+
 Der qualifizierte autonome Walkthrough bildet aus targetfreien Beobachtungen
 einen parametrisierten Kandidaten, trennt Kandidatenbildung und Prüfung und
 misst anschließend die Wiederverwendung auf zurückgehaltenen Aufgaben. Im hier
