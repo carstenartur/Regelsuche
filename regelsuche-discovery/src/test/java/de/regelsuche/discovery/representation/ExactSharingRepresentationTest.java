@@ -214,6 +214,25 @@ class ExactSharingRepresentationTest {
                 valid.expandedTreeHash(), valid.claimBoundary()));
     }
 
+    @Test
+    void evaluatesOneDefinitionPerCallAndPreservesExactArithmetic() {
+        String part = "((x - 1) / y + 2)";
+        var overlay = ExactSharingRepresentation.create(new RepeatedStructureExtractor()
+            .extractMaterial(part + " * " + part).getFirst());
+        var plan = overlay.prepareArithmetic();
+        var half = de.regelsuche.scalar.ExactRational.parse("1/2");
+        var one = de.regelsuche.scalar.ExactRational.ONE;
+        assertEquals(new ExactSharingArithmetic.Evaluation(half.add(one).pow(2), 4, 2),
+            plan.evaluate(java.util.Map.of("x", half, "y", one)));
+        assertEquals(new ExactSharingArithmetic.Evaluation(one.add(one).pow(2), 4, 2),
+            plan.evaluate(java.util.Map.of("x", one, "y", one)));
+        assertThrows(ArithmeticException.class, () ->
+            plan.evaluate(java.util.Map.of("x", one, "y", de.regelsuche.scalar.ExactRational.ZERO)));
+        assertThrows(IllegalArgumentException.class, () -> plan.evaluate(java.util.Map.of("x", one)));
+        assertThrows(IllegalArgumentException.class, () ->
+            ExactSharingRepresentation.create(materialCandidate()).prepareArithmetic());
+    }
+
     private static RepeatedStructureExtractionCandidate materialCandidate() {
         return new RepeatedStructureExtractor().extractMaterial(
             "(sin(x + 1) + cos(x + 1))"
