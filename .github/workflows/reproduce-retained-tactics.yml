@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: '049fe1fd68242b878015a289f507617952b600f8'
+          ref: '7e7355faa45f29b12b9b3db2d9a9d6895d782e8b'
           persist-credentials: false
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
@@ -29,6 +29,20 @@ jobs:
           done
           diff -rq "$RUNNER_TEMP/train-0" "$RUNNER_TEMP/train-1"
           sha256sum "$RUNNER_TEMP"/train-0/*
+      - name: Audit acquisition and calibration without creating final cases
+        shell: bash
+        run: |
+          mkdir -p docs/research/prospective-retained-tactics/training
+          cp "$RUNNER_TEMP"/train-0/* docs/research/prospective-retained-tactics/training/
+          python3 - <<'PY'
+          import runpy, sys
+          from pathlib import Path
+          path=Path("docs/research/prospective-retained-tactics").resolve()
+          sys.path.insert(0,str(path))
+          v=runpy.run_path(str(path/"verify.py"))
+          models, receipt, sources = v["materials"]()
+          print("Checked purchased models", [(k,len(m[1])) for k,m in models.items()], "calibration",len(receipt["calibrationSources"]))
+          PY
       - name: Reproduce earlier public development streams
         shell: bash
         run: |
@@ -40,7 +54,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: retained-tactic-development-049fe1fd6
+          name: retained-tactic-development-7e7355faa
           retention-days: 90
           path: |
             ${{ runner.temp }}/train-0/
