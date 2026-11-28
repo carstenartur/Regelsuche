@@ -37,9 +37,9 @@ public final class ComposedBilinearVerifier {
 <span class="fc" id="L37">        checks.retain(checks.requestCells(request) + checks.programCells(plan.program()) + 8);</span>
 <span class="fc bfc" id="L38" title="All 2 branches covered.">        for (var stage : plan.stages()) checks.retain(checks.stageCells(stage));</span>
 <span class="fc" id="L39">        request.checkInputs(checks.work);</span>
-<span class="fc" id="L40">        var direct = BilinearProgramVerifier.check(request, plan.program(), checks.retained, checks.work);</span>
-<span class="fc" id="L41">        var directCost = ComposedBilinearChecks.scale(direct, batchWidth);</span>
-<span class="fc" id="L42">        var cost = new ComposedBilinearPlan.Cost((long) rank * batchWidth, 0, 0);</span>
+<span class="fc" id="L40">        BilinearProgramVerifier.check(request, plan.program(), checks.retained, checks.work);</span>
+<span class="fc" id="L41">        var cost = new ComposedBilinearPlan.Cost((long) rank * batchWidth, 0, 0);</span>
+<span class="fc" id="L42">        var directCost = cost;</span>
 <span class="fc" id="L43">        var executors = new ArrayList&lt;ComposedBilinearPrepared.ExecutableStage&gt;(plan.stages().size());</span>
 <span class="fc bfc" id="L44" title="All 2 branches covered.">        if (rank != 0) {</span>
 <span class="fc" id="L45">            var matrices = List.of(plan.program().u(), plan.program().v(), plan.program().w());</span>
@@ -50,28 +50,30 @@ public final class ComposedBilinearVerifier {
 <span class="fc bfc" id="L50" title="All 2 branches covered.">                if (stage instanceof ComposedBilinearPlan.Linear linear) {</span>
 <span class="fc" id="L51">                    var compiled = checks.require(checks.child(limits -&gt; OperatorResidualSearch.prepare(expected,</span>
 <span class="fc" id="L52">                        linear.plan(), limits, checks.cancelled)));</span>
-                    // The compiler retains sparse (column, coefficient) entries and its source tree.
+                    // The compiler retains row registers, common scalings and the source tree.
 <span class="fc" id="L54">                    checks.retain(8L * checks.linearCells(linear.plan()));</span>
 <span class="fc" id="L55">                    executable = new ComposedBilinearPrepared.LinearStage(compiled);</span>
-<span class="fc" id="L56">                } else {</span>
-<span class="fc" id="L57">                    var spectral = (ComposedBilinearPlan.Spectral) stage;</span>
-<span class="fc bfc" id="L58" title="All 2 branches covered.">                    need(spectral.problem().batchWidth() == batchWidth, &quot;BATCH_WIDTH_MISMATCH&quot;);</span>
-<span class="fc" id="L59">                    checks.work.charge((long) expected.rows() * expected.columns());</span>
-<span class="fc" id="L60">                    need(expected.equals(spectral.problem().source()), &quot;STAGE_SOURCE_MISMATCH&quot;);</span>
-<span class="fc" id="L61">                    var problem = new SpectralBatchRepair.Problem(expected, spectral.problem().basis(),</span>
-<span class="fc" id="L62">                        spectral.problem().inverse(), batchWidth);</span>
+<span class="fc" id="L56">                    directCost = directCost.plus(ComposedBilinearChecks.scale(compiled.directCost(), batchWidth));</span>
+<span class="fc" id="L57">                } else {</span>
+<span class="fc" id="L58">                    var spectral = (ComposedBilinearPlan.Spectral) stage;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">                    need(spectral.problem().batchWidth() == batchWidth, &quot;BATCH_WIDTH_MISMATCH&quot;);</span>
+<span class="fc" id="L60">                    checks.work.charge((long) expected.rows() * expected.columns());</span>
+<span class="fc" id="L61">                    need(expected.equals(spectral.problem().source()), &quot;STAGE_SOURCE_MISMATCH&quot;);</span>
+<span class="fc" id="L62">                    var problem = new SpectralBatchRepair.Problem(expected, spectral.problem().basis(),</span>
+<span class="fc" id="L63">                        spectral.problem().inverse(), batchWidth);</span>
                     // Preparation invokes the independent spectral checker, including the original source binding.
-<span class="fc" id="L64">                    var compiled = checks.require(checks.child(limits -&gt; SpectralBatchRepair.prepare(problem,</span>
-<span class="fc" id="L65">                        spectral.certificate(), limits, checks.cancelled)));</span>
-<span class="fc" id="L66">                    checks.retain(compiled.retainedCells());</span>
-<span class="fc" id="L67">                    executable = new ComposedBilinearPrepared.SpectralStage(compiled);</span>
+<span class="fc" id="L65">                    var compiled = checks.require(checks.child(limits -&gt; SpectralBatchRepair.prepare(problem,</span>
+<span class="fc" id="L66">                        spectral.certificate(), limits, checks.cancelled)));</span>
+<span class="fc" id="L67">                    checks.retain(compiled.retainedCells());</span>
+<span class="fc" id="L68">                    executable = new ComposedBilinearPrepared.SpectralStage(compiled);</span>
+<span class="fc" id="L69">                    directCost = directCost.plus(compiled.directCost());</span>
                 }
-<span class="fc" id="L69">                cost = cost.plus(executable.batchCost(batchWidth));</span>
-<span class="fc" id="L70">                executors.add(executable);</span>
+<span class="fc" id="L71">                cost = cost.plus(executable.batchCost(batchWidth));</span>
+<span class="fc" id="L72">                executors.add(executable);</span>
             }
         }
-<span class="fc" id="L73">        checks.work.charge(0);</span>
-<span class="fc" id="L74">        return ComposedBilinearPrepared.checked(plan, request.tensor(), executors, cost, directCost,</span>
+<span class="fc" id="L75">        checks.work.charge(0);</span>
+<span class="fc" id="L76">        return ComposedBilinearPrepared.checked(plan, request.tensor(), executors, cost, directCost,</span>
             checks.retained - retainedBefore);
     }
 }

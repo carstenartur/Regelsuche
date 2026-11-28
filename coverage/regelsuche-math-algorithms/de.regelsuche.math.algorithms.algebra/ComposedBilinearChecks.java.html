@@ -172,9 +172,5 @@ final class ComposedBilinearChecks {
 <span class="fc" id="L172">            Math.multiplyExact(cost.additions(), batchWidth));</span>
     }
 
-    static ComposedBilinearPlan.Cost scale(BilinearProgram.Cost cost, int batchWidth) {
-<span class="fc" id="L176">        return new ComposedBilinearPlan.Cost(Math.multiplyExact(cost.variableMultiplications(), batchWidth),</span>
-<span class="fc" id="L177">            Math.multiplyExact(cost.constantMultiplications(), batchWidth), Math.multiplyExact(cost.additions(), batchWidth));</span>
-    }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

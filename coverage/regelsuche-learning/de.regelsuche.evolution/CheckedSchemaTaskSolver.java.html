@@ -107,6 +107,9 @@ public final class CheckedSchemaTaskSolver {
 
     private final TypedLearnedMoveInventory.SearchSession session;
     private final CheckedSchemaMatcherPlan.Compilation preparation;
+    private final CheckedSchemaMatcherPlan selectedPlan;
+    private final PrimitiveSchemaReachability primitiveRoute;
+    private final CheckedSchemaTaskSolver primitiveFallback;
     private final boolean breadthFirstPriority;
     private final boolean exactPolynomialSteps;
     private final boolean expansionRulesAttached;
@@ -114,214 +117,275 @@ public final class CheckedSchemaTaskSolver {
 
     CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
             CheckedSchemaMatcherPlan.Compilation preparation) {
-<span class="fc" id="L117">        this(session, preparation, false, false, false, false);</span>
-<span class="fc" id="L118">    }</span>
+<span class="fc" id="L120">        this(session, preparation, null);</span>
+<span class="fc" id="L121">    }</span>
+
+    CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session, CheckedSchemaMatcherPlan.Compilation preparation,
+            CheckedSchemaMatcherPlan selectedPlan) {
+<span class="fc" id="L125">        this(session, preparation, false, false, false, false, selectedPlan);</span>
+<span class="fc" id="L126">    }</span>
 
     private CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
             CheckedSchemaMatcherPlan.Compilation preparation, boolean breadthFirstPriority, boolean exactPolynomialSteps,
             boolean expansionRulesAttached,
-<span class="fc" id="L123">            boolean expansionBridgesForOtherGoals) {</span>
-<span class="fc" id="L124">        this.session = Objects.requireNonNull(session, &quot;session&quot;);</span>
-<span class="fc" id="L125">        this.preparation = preparation;</span>
-<span class="fc" id="L126">        this.breadthFirstPriority = breadthFirstPriority;</span>
-<span class="fc" id="L127">        this.exactPolynomialSteps = exactPolynomialSteps;</span>
-<span class="fc" id="L128">        this.expansionRulesAttached = expansionRulesAttached;</span>
-<span class="fc" id="L129">        this.expansionBridgesForOtherGoals = expansionBridgesForOtherGoals;</span>
-<span class="fc" id="L130">    }</span>
+            boolean expansionBridgesForOtherGoals, CheckedSchemaMatcherPlan selectedPlan) {
+<span class="fc" id="L132">        this(session, preparation, breadthFirstPriority, exactPolynomialSteps, expansionRulesAttached,</span>
+            expansionBridgesForOtherGoals, selectedPlan, null, null);
+<span class="fc" id="L134">    }</span>
+
+    private CheckedSchemaTaskSolver(TypedLearnedMoveInventory.SearchSession session,
+            CheckedSchemaMatcherPlan.Compilation preparation, boolean breadthFirstPriority, boolean exactPolynomialSteps,
+            boolean expansionRulesAttached, boolean expansionBridgesForOtherGoals, CheckedSchemaMatcherPlan selectedPlan,
+<span class="fc" id="L139">            PrimitiveSchemaReachability primitiveRoute, CheckedSchemaTaskSolver primitiveFallback) {</span>
+<span class="fc" id="L140">        this.primitiveRoute = primitiveRoute;</span>
+<span class="fc" id="L141">        this.primitiveFallback = primitiveFallback;</span>
+<span class="fc" id="L142">        this.session = Objects.requireNonNull(session, &quot;session&quot;);</span>
+<span class="fc" id="L143">        this.preparation = preparation;</span>
+<span class="fc" id="L144">        this.selectedPlan = selectedPlan;</span>
+<span class="fc" id="L145">        this.breadthFirstPriority = breadthFirstPriority;</span>
+<span class="fc" id="L146">        this.exactPolynomialSteps = exactPolynomialSteps;</span>
+<span class="fc" id="L147">        this.expansionRulesAttached = expansionRulesAttached;</span>
+<span class="fc" id="L148">        this.expansionBridgesForOtherGoals = expansionBridgesForOtherGoals;</span>
+<span class="fc" id="L149">    }</span>
+
+    CheckedSchemaTaskSolver withPrimitiveRoute(List&lt;MoveProvider&gt; primitives, PrimitiveSchemaReachability route,
+            String routeRevision) {
+<span class="fc" id="L153">        var guarded = new java.util.ArrayList&lt;&gt;(primitives);</span>
+<span class="fc" id="L154">        guarded.set(0, route.withDomainCheck(guarded.getFirst()));</span>
+<span class="fc" id="L155">        var fallback = new CheckedSchemaTaskSolver(new TypedLearnedMoveInventory.SearchSession(guarded, List.of(), session.verifier()), null);</span>
+<span class="fc" id="L156">        var receipt = preparation;</span>
+<span class="fc" id="L157">        var revision = receipt.revision() + &quot;+&quot; + routeRevision;</span>
+<span class="fc" id="L158">        var identity = receipt.configurationHash() + &quot;;&quot; + routeRevision;</span>
+<span class="fc" id="L159">        var routed = new CheckedSchemaMatcherPlan.Compilation(revision, SchematicProofPlan.hash(identity),</span>
+<span class="fc" id="L160">            Math.addExact(receipt.workUnits(), route.compilationWork() + identity.length()),</span>
+<span class="fc" id="L161">            receipt.includedSchemas(), receipt.patternNodeVisits() + route.patternVisits(), receipt.orderingComparisons());</span>
+<span class="fc" id="L162">        return new CheckedSchemaTaskSolver(session, routed, false, false, false, false, selectedPlan, route, fallback);</span>
+    }
 
     CheckedSchemaTaskSolver withConstructions(List&lt;StructuralConstructionPrograms.Operation&gt; operations,
             boolean prioritizeBreadth) {
-<span class="fc" id="L134">        var providers = new java.util.ArrayList&lt;&gt;(session.providers());</span>
-<span class="fc" id="L135">        var verifiers = new java.util.HashMap&lt;String, TypedMoveSearch.Verifier&gt;();</span>
-<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (var operation : operations) {</span>
-<span class="fc" id="L137">            var provider = new StructuralConstructionProvider(operation);</span>
-<span class="fc bfc" id="L138" title="All 2 branches covered.">            providers.add(preparation == null ? provider : provider.incremental());</span>
-<span class="fc" id="L139">            verifiers.put(provider.descriptor().id(), provider.verifier());</span>
-<span class="fc" id="L140">        }</span>
-<span class="fc" id="L141">        var augmented = new TypedLearnedMoveInventory.SearchSession(providers, session.primitiveCaches(),</span>
-<span class="fc" id="L142">            (source, move, context) -&gt; verifiers.getOrDefault(move.ruleId(), session.verifier()).verify(source, move, context));</span>
-<span class="fc" id="L143">        return new CheckedSchemaTaskSolver(augmented, preparation, prioritizeBreadth, exactPolynomialSteps,</span>
-            expansionRulesAttached, expansionBridgesForOtherGoals);
+<span class="fc" id="L167">        var providers = new java.util.ArrayList&lt;&gt;(session.providers());</span>
+<span class="fc" id="L168">        var verifiers = new java.util.HashMap&lt;String, TypedMoveSearch.Verifier&gt;();</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        for (var operation : operations) {</span>
+<span class="fc" id="L170">            var provider = new StructuralConstructionProvider(operation);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            providers.add(preparation == null ? provider : provider.incremental());</span>
+<span class="fc" id="L172">            verifiers.put(provider.descriptor().id(), provider.verifier());</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        var augmented = new TypedLearnedMoveInventory.SearchSession(providers, session.primitiveCaches(),</span>
+<span class="fc" id="L175">            (source, move, context) -&gt; verifiers.getOrDefault(move.ruleId(), session.verifier()).verify(source, move, context));</span>
+<span class="fc" id="L176">        return new CheckedSchemaTaskSolver(augmented, preparation, prioritizeBreadth, exactPolynomialSteps,</span>
+            expansionRulesAttached, expansionBridgesForOtherGoals, selectedPlan);
     }
 
     CheckedSchemaTaskSolver withExactPolynomialSteps() {
-<span class="fc" id="L148">        return new CheckedSchemaTaskSolver(session, preparation, breadthFirstPriority, true,</span>
-            expansionRulesAttached, expansionBridgesForOtherGoals);
+<span class="fc" id="L181">        return new CheckedSchemaTaskSolver(session, preparation, breadthFirstPriority, true,</span>
+            expansionRulesAttached, expansionBridgesForOtherGoals, selectedPlan);
     }
 
     CheckedSchemaTaskSolver withDirectPolynomial(boolean sharedArithmetic) {
-<span class="fc" id="L153">        return withOnlyPolynomialProvider(new StructuralConstructionProvider(</span>
+<span class="fc" id="L186">        return withOnlyPolynomialProvider(new StructuralConstructionProvider(</span>
             StructuralConstructionPrograms.Operation.POLYNOMIAL_DIRECT, 0, sharedArithmetic));
     }
 
     CheckedSchemaTaskSolver withRootHorner() {
-<span class="fc" id="L158">        return withOnlyPolynomialProvider(StructuralConstructionProvider.sharedHornerRoot());</span>
+<span class="fc" id="L191">        return withOnlyPolynomialProvider(StructuralConstructionProvider.sharedHornerRoot());</span>
     }
 
     private CheckedSchemaTaskSolver withOnlyPolynomialProvider(StructuralConstructionProvider provider) {
-<span class="fc" id="L162">        var standalone = new TypedLearnedMoveInventory.SearchSession(List.of(provider), session.primitiveCaches(), provider.verifier());</span>
-<span class="fc" id="L163">        return new CheckedSchemaTaskSolver(standalone, preparation, false, true, false, false);</span>
+<span class="fc" id="L195">        var standalone = new TypedLearnedMoveInventory.SearchSession(List.of(provider), session.primitiveCaches(), provider.verifier());</span>
+<span class="fc" id="L196">        return new CheckedSchemaTaskSolver(standalone, preparation, false, true, false, false, null);</span>
     }
 
     CheckedSchemaTaskSolver withExpansionRules(boolean bridgesForOtherGoals) {
-<span class="fc bfc" id="L167" title="All 2 branches covered.">        return new CheckedSchemaTaskSolver(StructuralExpansionRules.attach(session, preparation != null), preparation,</span>
-            breadthFirstPriority, exactPolynomialSteps, true, bridgesForOtherGoals);
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        return new CheckedSchemaTaskSolver(StructuralExpansionRules.attach(session, preparation != null), preparation,</span>
+            breadthFirstPriority, exactPolynomialSteps, true, bridgesForOtherGoals, selectedPlan);
     }
 
     /** Paid once when this immutable solver is prepared; never silently multiplied or discarded. */
-<span class="fc bfc" id="L172" title="All 2 branches covered.">    public long preparationWork() { return preparation == null ? 0 : preparation.workUnits(); }</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">    public long preparationWork() { return preparation == null ? 0 : preparation.workUnits(); }</span>
     public Optional&lt;CheckedSchemaMatcherPlan.Compilation&gt; preparationReceipt() {
-<span class="nc" id="L174">        return Optional.ofNullable(preparation);</span>
+<span class="fc" id="L207">        return Optional.ofNullable(preparation);</span>
     }
 
     /** Fresh cursors, scoped codec reuse, one budget, and final replay for every invocation. */
     public Solution solve(Task task) {
-<span class="fc" id="L179">        var prepared = prepare(task);</span>
-<span class="fc" id="L180">        var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,</span>
-<span class="fc" id="L181">            () -&gt; new TypedSourceOnlySearch().searchUntil(problem(task), prepared.objective(),</span>
-<span class="fc" id="L182">                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));</span>
-<span class="fc" id="L183">        return new Solution(task, result, prepared.checkedSteps());</span>
+<span class="fc" id="L212">        var prepared = prepare(task);</span>
+<span class="fc" id="L213">        var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,</span>
+<span class="fc" id="L214">            () -&gt; new TypedSourceOnlySearch().searchUntil(problem(task), prepared.objective(),</span>
+<span class="fc" id="L215">                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));</span>
+<span class="fc" id="L216">        return new Solution(task, result, prepared.checkedSteps());</span>
     }
 
     /** A retained path replaces proposal generation only; both verification passes remain fresh. */
     Solution replay(Task task, TypedMoveSearch.TypedProvider path) {
-<span class="fc" id="L188">        var prepared = prepare(task);</span>
-<span class="fc" id="L189">        var original = problem(task);</span>
-<span class="fc" id="L190">        var replay = new TypedMoveSearch.Problem(original.source(), original.context(), List.of(path),</span>
-<span class="fc" id="L191">            TypedMoveSearch.Policy.INVENTORY_ORDER, original.verifier(), original.stateScore(), original.mode(),</span>
-<span class="fc" id="L192">            MoveSearch.Scheduling.STAGED, original.budget(), original.stateValue());</span>
-<span class="fc" id="L193">        var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,</span>
-<span class="fc" id="L194">            () -&gt; new TypedSourceOnlySearch().searchUntil(replay, prepared.objective(),</span>
-<span class="fc" id="L195">                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));</span>
-<span class="fc" id="L196">        return new Solution(task, result, prepared.checkedSteps());</span>
+<span class="fc" id="L221">        var prepared = prepare(task);</span>
+<span class="fc" id="L222">        var original = problem(task);</span>
+<span class="fc" id="L223">        var replay = new TypedMoveSearch.Problem(original.source(), original.context(), List.of(path),</span>
+<span class="fc" id="L224">            TypedMoveSearch.Policy.INVENTORY_ORDER, original.verifier(), original.stateScore(), original.mode(),</span>
+<span class="fc" id="L225">            MoveSearch.Scheduling.STAGED, original.budget(), original.stateValue());</span>
+<span class="fc" id="L226">        var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,</span>
+<span class="fc" id="L227">            () -&gt; new TypedSourceOnlySearch().searchUntil(replay, prepared.objective(),</span>
+<span class="fc" id="L228">                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE));</span>
+<span class="fc" id="L229">        return new Solution(task, result, prepared.checkedSteps());</span>
     }
 
     /** Source-only arithmetic minimization with the same frontier, paid objective and final replay. */
     public TypedSourceOnlySearch.Result simplify(Expr source, List&lt;String&gt; assumptions, MoveSearch.Budget budget) {
-<span class="fc bfc" id="L201" title="All 2 branches covered.">        return simplify(source, assumptions, budget, sharedHorner()</span>
-<span class="fc" id="L202">            ? state -&gt; TypedPolynomialSurfaceCost.evaluateSharedArithmetic(state.expression())</span>
-<span class="fc" id="L203">            : state -&gt; TypedPolynomialSurfaceCost.evaluate(state.expression()));</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        return simplify(source, assumptions, budget, sharedHorner()</span>
+<span class="fc" id="L235">            ? state -&gt; TypedPolynomialSurfaceCost.evaluateSharedArithmetic(state.expression())</span>
+<span class="fc" id="L236">            : state -&gt; TypedPolynomialSurfaceCost.evaluate(state.expression()));</span>
     }
 
     TypedSourceOnlySearch.Result simplify(Expr source, List&lt;String&gt; assumptions,
             MoveSearch.Budget budget, TypedSourceOnlySearch.Objective objective) {
-<span class="fc" id="L208">        var task = new Task(source, assumptions, new Goal(objective, Long.MIN_VALUE), budget);</span>
-<span class="fc" id="L209">        var prepared = prepare(task);</span>
-<span class="fc" id="L210">        return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,</span>
-<span class="fc" id="L211">            () -&gt; new TypedSourceOnlySearch().search(problem(task), prepared.objective()));</span>
+<span class="fc" id="L241">        var task = new Task(source, assumptions, new Goal(objective, Long.MIN_VALUE), budget);</span>
+<span class="fc" id="L242">        var prepared = prepare(task);</span>
+<span class="fc" id="L243">        return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,</span>
+<span class="fc" id="L244">            () -&gt; new TypedSourceOnlySearch().search(problem(task), prepared.objective()));</span>
     }
 
     /** Continue the same checked frontier and independently replay a bounded set of alternatives. */
     public TypedSearchAlternatives.Result explore(Task task, long reserveWork, int maximumAlternatives) {
-<span class="fc" id="L216">        var prepared = prepare(task);</span>
-<span class="fc" id="L217">        return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,</span>
-<span class="fc" id="L218">            () -&gt; new TypedSourceOnlySearch().searchAlternatives(problem(task), prepared.objective(),</span>
-<span class="fc" id="L219">                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE,</span>
+<span class="fc" id="L249">        var prepared = prepare(task);</span>
+<span class="fc" id="L250">        return CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,</span>
+<span class="fc" id="L251">            () -&gt; new TypedSourceOnlySearch().searchAlternatives(problem(task), prepared.objective(),</span>
+<span class="fc" id="L252">                task.goal().maximumOutputScore(), SearchContinuationContract.PATH_SENSITIVE,</span>
                 reserveWork, maximumAlternatives));
     }
 
-<span class="fc" id="L223">    private record Prepared(TypedSourceOnlySearch.Objective objective, boolean checkedSteps) { }</span>
+<span class="fc" id="L256">    private record Prepared(TypedSourceOnlySearch.Objective objective, boolean checkedSteps) { }</span>
 
     private Prepared prepare(Task task) {
-<span class="fc" id="L226">        Objects.requireNonNull(task, &quot;task&quot;);</span>
-<span class="fc" id="L227">        var original = task.goal().objective();</span>
-<span class="fc bfc" id="L228" title="All 4 branches covered.">        boolean checkedSteps = exactPolynomialSteps || StructuralTaskObjective.requiresExactPolynomialSteps(original);</span>
-<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (checkedSteps) StructuralCheckedDomain.requireUnobserved();</span>
-<span class="fc bfc" id="L230" title="All 2 branches covered.">        var sourceInspection = checkedSteps ? inspectSource(task, sharedHorner()) : new SourceInspection(0, 0);</span>
-<span class="fc" id="L231">        long inspection = sourceInspection.work();</span>
-<span class="fc bfc" id="L232" title="All 4 branches covered.">        TypedSourceOnlySearch.Objective objective = (breadthFirstPriority || StructuralTaskObjective.requiresExactPolynomialSteps(original))</span>
-<span class="fc bfc" id="L233" title="All 2 branches covered.">            &amp;&amp; original instanceof StructuralTaskObjective structural</span>
-<span class="fc" id="L234">            ? structural::evaluateWithProductWork : original;</span>
-<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (inspection &gt; 0) {</span>
-<span class="fc" id="L236">            var delegate = objective;</span>
-<span class="fc" id="L237">            objective = state -&gt; {</span>
-<span class="fc bfc" id="L238" title="All 4 branches covered.">                if (state.searchDepth() == 0 &amp;&amp; Math.addExact(inspection, sourceInspection.nodes()) &gt;= task.budget().totalWork()) {</span>
+<span class="fc" id="L259">        Objects.requireNonNull(task, &quot;task&quot;);</span>
+<span class="fc" id="L260">        var original = task.goal().objective();</span>
+<span class="fc bfc" id="L261" title="All 4 branches covered.">        boolean checkedSteps = exactPolynomialSteps || StructuralTaskObjective.requiresExactPolynomialSteps(original);</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (checkedSteps) StructuralCheckedDomain.requireUnobserved();</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        var sourceInspection = checkedSteps ? inspectSource(task, sharedHorner()) : new SourceInspection(0, 0);</span>
+<span class="fc" id="L264">        long inspection = sourceInspection.work();</span>
+<span class="fc bfc" id="L265" title="All 4 branches covered.">        TypedSourceOnlySearch.Objective objective = (breadthFirstPriority || StructuralTaskObjective.requiresExactPolynomialSteps(original))</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            &amp;&amp; original instanceof StructuralTaskObjective structural</span>
+<span class="fc" id="L267">            ? structural::evaluateWithProductWork : original;</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        if (inspection &gt; 0) {</span>
+<span class="fc" id="L269">            var delegate = objective;</span>
+<span class="fc" id="L270">            objective = state -&gt; {</span>
+<span class="fc bfc" id="L271" title="All 4 branches covered.">                if (state.searchDepth() == 0 &amp;&amp; Math.addExact(inspection, sourceInspection.nodes()) &gt;= task.budget().totalWork()) {</span>
                     // Source and the existing root node-count assessment precede the objective.
-<span class="fc" id="L240">                    return new TypedSourceOnlySearch.Score(Long.MAX_VALUE, Math.addExact(inspection, 1));</span>
+<span class="fc" id="L273">                    return new TypedSourceOnlySearch.Score(Long.MAX_VALUE, Math.addExact(inspection, 1));</span>
                 }
-<span class="fc" id="L242">                var score = delegate.evaluate(state);</span>
-<span class="fc bfc" id="L243" title="All 2 branches covered.">                return state.searchDepth() == 0</span>
-<span class="fc" id="L244">                    ? new TypedSourceOnlySearch.Score(score.value(), Math.addExact(score.work(), inspection)) : score;</span>
+<span class="fc" id="L275">                var score = delegate.evaluate(state);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">                return state.searchDepth() == 0</span>
+<span class="fc" id="L277">                    ? new TypedSourceOnlySearch.Score(score.value(), Math.addExact(score.work(), inspection)) : score;</span>
             };
         }
-<span class="fc" id="L247">        return new Prepared(objective, checkedSteps);</span>
+<span class="fc" id="L280">        return new Prepared(objective, checkedSteps);</span>
     }
 
-<span class="fc" id="L250">    private record SourceInspection(long work, int nodes) { }</span>
+<span class="fc" id="L283">    private record SourceInspection(long work, int nodes) { }</span>
 
     private static SourceInspection inspectSource(Task task, boolean sharedArithmetic) {
-<span class="fc" id="L253">        var work = new CheckedSchemaSupport.Work();</span>
+<span class="fc" id="L286">        var work = new CheckedSchemaSupport.Work();</span>
         try {
-<span class="fc" id="L255">            int nodes = StructuralCheckedDomain.inspect(task.source(), work, sharedArithmetic);</span>
-<span class="fc" id="L256">            return new SourceInspection(work.units, nodes);</span>
-<span class="fc" id="L257">        } catch (CheckedSchemaSupport.DomainRejected unsupported) {</span>
-<span class="fc" id="L258">            throw new UnsupportedTaskException(work.units, 0, unsupported);</span>
+<span class="fc" id="L288">            int nodes = StructuralCheckedDomain.inspect(task.source(), work, sharedArithmetic);</span>
+<span class="fc" id="L289">            return new SourceInspection(work.units, nodes);</span>
+<span class="fc" id="L290">        } catch (CheckedSchemaSupport.DomainRejected unsupported) {</span>
+<span class="fc" id="L291">            throw new UnsupportedTaskException(work.units, 0, unsupported);</span>
         }
     }
 
     // The primitive control uses its cheaper batch scheduler; it is not handicapped by unused cursor machinery.
     TypedMoveSearch.Problem problem(Task task) {
-<span class="fc" id="L264">        var standalone = standalonePolynomial();</span>
-<span class="fc" id="L265">        return new TypedMoveSearch.Problem(task.source(),</span>
-<span class="fc" id="L266">            TypedMoveSearch.Context.sourceOnly(task.assumptions(), MoveContext.Phase.FROZEN_EVALUATION),</span>
-<span class="fc" id="L267">            providersFor(task, standalone), policyFor(task),</span>
-<span class="fc bfc" id="L268" title="All 4 branches covered.">            standalone.isEmpty()</span>
-<span class="fc bfc" id="L269" title="All 2 branches covered.">                    &amp;&amp; (exactPolynomialSteps || StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective()))</span>
-<span class="fc" id="L270">                ? StructuralStepVerifier.checked(session.verifier()) : session.verifier(), state -&gt; 0,</span>
-<span class="pc bpc" id="L271" title="1 of 4 branches missed.">            MoveSearch.Mode.FAST, preparation == null || standalone.isPresent() ? MoveSearch.Scheduling.STAGED</span>
-<span class="fc" id="L272">                : MoveSearch.Scheduling.STAGED_INCREMENTAL, task.budget(),</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (primitiveRoute == null) return problem(task, null);</span>
+<span class="fc" id="L298">        var decision = primitiveRoute.inspect(task.source(), task.budget().totalWork());</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        var solver = decision.primitiveOnly() ? primitiveFallback : this;</span>
+<span class="fc" id="L300">        return solver.problem(task, decision);</span>
+    }
+
+    private TypedMoveSearch.Problem problem(Task task, PrimitiveSchemaReachability.Decision decision) {
+<span class="fc" id="L304">        var standalone = standalonePolynomial();</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        var receipts = selectedPlan == null ? null : new CheckedDomainSizeReceipts(selectedPlan.bounds());</span>
+<span class="fc" id="L306">        long routingWork = bindRoot(task, decision, receipts);</span>
+<span class="fc" id="L307">        var providers = providersFor(task, standalone);</span>
+        // Bind one per-task receipt map to the selected cursor and substitute its provider.
+        // The state-value ledger pays once at root, including on already-satisfied tasks.
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        long querySetup = receipts == null ? 0 : providers.size() + 10L;</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (receipts != null) {</span>
+<span class="fc" id="L312">            var replacement = selectedPlan.provider(receipts);</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">            providers = providers.stream().map(provider -&gt; provider.descriptor().id().equals(replacement.descriptor().id())</span>
+<span class="fc" id="L314">                ? replacement : provider).toList();</span>
+        }
+<span class="fc" id="L316">        return new TypedMoveSearch.Problem(task.source(),</span>
+<span class="fc" id="L317">            TypedMoveSearch.Context.sourceOnly(task.assumptions(), MoveContext.Phase.FROZEN_EVALUATION),</span>
+<span class="fc" id="L318">            providers, policyFor(task),</span>
+<span class="fc bfc" id="L319" title="All 4 branches covered.">            standalone.isEmpty()</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">                    &amp;&amp; (exactPolynomialSteps || StructuralTaskObjective.requiresExactPolynomialSteps(task.goal().objective()))</span>
+<span class="fc" id="L321">                ? StructuralStepVerifier.checked(session.verifier()) : session.verifier(), state -&gt; 0,</span>
+<span class="pc bpc" id="L322" title="1 of 4 branches missed.">            MoveSearch.Mode.FAST, preparation == null || standalone.isPresent() ? MoveSearch.Scheduling.STAGED</span>
+<span class="fc" id="L323">                : MoveSearch.Scheduling.STAGED_INCREMENTAL, task.budget(),</span>
             (state, context) -&gt; {
-<span class="fc" id="L274">                var size = NativeNodeCountObjective.INSTANCE.evaluate(state);</span>
-<span class="fc bfc" id="L275" title="All 2 branches covered.">                double priority = breadthFirstPriority ? -state.searchDepth() : -size.value();</span>
-<span class="fc" id="L276">                return new StateValue.Assessment(Math.toIntExact(size.value()), priority, size.work(), 0, Map.of());</span>
+<span class="fc bfc" id="L325" title="All 6 branches covered.">                var size = decision != null &amp;&amp; decision.nodes() &gt; 0 &amp;&amp; state.searchDepth() == 0</span>
+<span class="fc" id="L326">                    ? new TypedSourceOnlySearch.Score(decision.nodes(), routingWork)</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">                    : receipts == null ? NativeNodeCountObjective.INSTANCE.evaluate(state) : receipts.evaluate(state);</span>
+<span class="fc bfc" id="L328" title="All 6 branches covered.">                long work = decision != null &amp;&amp; decision.nodes() == 0 &amp;&amp; state.searchDepth() == 0</span>
+<span class="fc" id="L329">                    ? Math.addExact(size.work(), routingWork) : size.work();</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">                double priority = breadthFirstPriority ? -state.searchDepth() : -size.value();</span>
+<span class="fc" id="L331">                return new StateValue.Assessment(Math.toIntExact(size.value()), priority,</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">                    state.searchDepth() == 0 ? Math.addExact(querySetup, work) : work, 0, Map.of());</span>
             });
     }
 
+    private static long bindRoot(Task task, PrimitiveSchemaReachability.Decision decision, CheckedDomainSizeReceipts receipts) {
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (decision == null) return 0;</span>
+<span class="fc bfc" id="L338" title="All 4 branches covered.">        if (receipts == null || decision.nodes() == 0) return decision.work();</span>
+<span class="fc" id="L339">        var work = new CheckedSchemaSupport.Work();</span>
+<span class="fc" id="L340">        receipts.remember(task.source(), decision.nodes(), work);</span>
+<span class="fc" id="L341">        return Math.addExact(decision.work(), work.units);</span>
+    }
+
     private List&lt;MoveProvider&gt; providersFor(Task task, Optional&lt;StructuralConstructionProvider&gt; standalone) {
-<span class="fc" id="L281">        var direct = standalone.filter(StructuralConstructionProvider::isDirectPolynomial);</span>
-<span class="fc bfc" id="L282" title="All 2 branches covered.">        if (direct.isPresent()) return List.of(direct.orElseThrow().forBudget(task.budget()));</span>
-<span class="fc bfc" id="L283" title="All 4 branches covered.">        if (!expansionRulesAttached || expansionBridgesForOtherGoals</span>
-<span class="fc bfc" id="L284" title="All 2 branches covered.">                || task.goal().objective() == StructuralTaskObjective.EXPANDED_POLYNOMIAL) return session.providers();</span>
-<span class="fc bfc" id="L285" title="All 2 branches covered.">        return session.providers().stream().filter(provider -&gt; !StructuralExpansionRules.isExpansionProvider(provider.descriptor())).toList();</span>
+<span class="fc" id="L345">        var direct = standalone.filter(StructuralConstructionProvider::isDirectPolynomial);</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        if (direct.isPresent()) return List.of(direct.orElseThrow().forBudget(task.budget()));</span>
+<span class="fc bfc" id="L347" title="All 4 branches covered.">        if (!expansionRulesAttached || expansionBridgesForOtherGoals</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">                || task.goal().objective() == StructuralTaskObjective.EXPANDED_POLYNOMIAL) return session.providers();</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        return session.providers().stream().filter(provider -&gt; !StructuralExpansionRules.isExpansionProvider(provider.descriptor())).toList();</span>
     }
 
     private Optional&lt;StructuralConstructionProvider&gt; standalonePolynomial() {
-<span class="fc bfc" id="L289" title="All 4 branches covered.">        if (session.providers().size() == 1 &amp;&amp; session.providers().getFirst() instanceof StructuralConstructionProvider provider</span>
-<span class="pc bpc" id="L290" title="1 of 4 branches missed.">                &amp;&amp; (provider.isDirectPolynomial() || provider.isSharedHorner())) return Optional.of(provider);</span>
-<span class="fc" id="L291">        return Optional.empty();</span>
+<span class="fc bfc" id="L353" title="All 4 branches covered.">        if (session.providers().size() == 1 &amp;&amp; session.providers().getFirst() instanceof StructuralConstructionProvider provider</span>
+<span class="pc bpc" id="L354" title="1 of 4 branches missed.">                &amp;&amp; (provider.isDirectPolynomial() || provider.isSharedHorner())) return Optional.of(provider);</span>
+<span class="fc" id="L355">        return Optional.empty();</span>
     }
 
     private boolean sharedHorner() {
-<span class="fc" id="L295">        return standalonePolynomial().filter(StructuralConstructionProvider::isSharedHorner).isPresent();</span>
+<span class="fc" id="L359">        return standalonePolynomial().filter(StructuralConstructionProvider::isSharedHorner).isPresent();</span>
     }
 
     private KnowledgeFirst policyFor(Task task) {
-<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (!breadthFirstPriority) return KnowledgeFirst.INSTANCE;</span>
-<span class="fc bfc" id="L300" title="All 4 branches covered.">        return expansionRulesAttached &amp;&amp; task.goal().objective() != StructuralTaskObjective.EXPANDED_POLYNOMIAL</span>
-<span class="fc" id="L301">            ? KnowledgeFirst.STRUCTURAL_DEFER_EXPANSION : KnowledgeFirst.STRUCTURAL_EXPLORATION;</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        if (!breadthFirstPriority) return KnowledgeFirst.INSTANCE;</span>
+<span class="fc bfc" id="L364" title="All 4 branches covered.">        return expansionRulesAttached &amp;&amp; task.goal().objective() != StructuralTaskObjective.EXPANDED_POLYNOMIAL</span>
+<span class="fc" id="L365">            ? KnowledgeFirst.STRUCTURAL_DEFER_EXPANSION : KnowledgeFirst.STRUCTURAL_EXPLORATION;</span>
     }
 
     /** Ordering alone grants no mathematical authority; the normal verifier still admits each edge. */
-<span class="fc" id="L305">    private enum KnowledgeFirst implements TypedMoveSearch.TypedPolicy {</span>
-<span class="fc" id="L306">        INSTANCE, STRUCTURAL_EXPLORATION, STRUCTURAL_DEFER_EXPANSION;</span>
-<span class="fc" id="L307">        @Override public double score(SearchMove move, MoveState state, MoveContext context) { return 0; }</span>
+<span class="fc" id="L369">    private enum KnowledgeFirst implements TypedMoveSearch.TypedPolicy {</span>
+<span class="fc" id="L370">        INSTANCE, STRUCTURAL_EXPLORATION, STRUCTURAL_DEFER_EXPANSION;</span>
+<span class="fc" id="L371">        @Override public double score(SearchMove move, MoveState state, MoveContext context) { return 0; }</span>
         @Override public double providerScore(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
-<span class="fc bfc" id="L309" title="All 2 branches covered.">            if (this == INSTANCE) return 0;</span>
-<span class="fc" id="L310">            String id = provider.id();</span>
-<span class="fc bfc" id="L311" title="All 2 branches covered.">            if (id.endsWith(&quot;:AUXILIARY_FACTOR&quot;)) return 4;</span>
-<span class="fc bfc" id="L312" title="All 2 branches covered.">            if (id.endsWith(&quot;:FACTOR_DIFFERENCE&quot;)) return 3;</span>
-<span class="fc bfc" id="L313" title="All 2 branches covered.">            if (id.endsWith(&quot;:RECOGNIZE_SQUARE&quot;)) return 2;</span>
-<span class="fc bfc" id="L314" title="All 2 branches covered.">            if (id.endsWith(&quot;:RECOGNIZE_METERED_SQUARE&quot;)) return 2;</span>
-<span class="fc bfc" id="L315" title="All 2 branches covered.">            if (id.endsWith(&quot;:RECOGNIZE_RATIONAL_SQUARE&quot;)) return 2;</span>
-<span class="fc bfc" id="L316" title="All 2 branches covered.">            if (id.endsWith(&quot;:EXPOSE_SQUARE&quot;)) return 1;</span>
-<span class="fc bfc" id="L317" title="All 2 branches covered.">            if (id.endsWith(&quot;:RATIONAL_EXPOSE_SQUARE&quot;)) return 1;</span>
-<span class="fc" id="L318">            return 0;</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">            if (this == INSTANCE) return 0;</span>
+<span class="fc" id="L374">            String id = provider.id();</span>
+<span class="fc bfc" id="L375" title="All 2 branches covered.">            if (id.endsWith(&quot;:AUXILIARY_FACTOR&quot;)) return 4;</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">            if (id.endsWith(&quot;:FACTOR_DIFFERENCE&quot;)) return 3;</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">            if (id.endsWith(&quot;:RECOGNIZE_SQUARE&quot;)) return 2;</span>
+<span class="fc bfc" id="L378" title="All 2 branches covered.">            if (id.endsWith(&quot;:RECOGNIZE_METERED_SQUARE&quot;)) return 2;</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">            if (id.endsWith(&quot;:RECOGNIZE_RATIONAL_SQUARE&quot;)) return 2;</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">            if (id.endsWith(&quot;:EXPOSE_SQUARE&quot;)) return 1;</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">            if (id.endsWith(&quot;:RATIONAL_EXPOSE_SQUARE&quot;)) return 1;</span>
+<span class="fc" id="L382">            return 0;</span>
         }
         @Override public Stage stage(MoveProvider.Descriptor provider, MoveState state, MoveContext context) {
-<span class="fc bfc" id="L321" title="All 2 branches covered.">            if (StructuralExpansionRules.isExpansionProvider(provider))</span>
-<span class="fc bfc" id="L322" title="All 2 branches covered.">                return this == STRUCTURAL_DEFER_EXPANSION ? Stage.EXPENSIVE : Stage.NORMAL_PRIMITIVE;</span>
-<span class="fc bfc" id="L323" title="All 2 branches covered.">            return provider.sourceKind() == SearchMove.SourceKind.LEARNED ? Stage.VALUABLE_LEARNED</span>
-<span class="fc" id="L324">                : MovePriorityPolicy.INVENTORY_ORDER.stage(provider, state, context);</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            if (StructuralExpansionRules.isExpansionProvider(provider))</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">                return this == STRUCTURAL_DEFER_EXPANSION ? Stage.EXPENSIVE : Stage.NORMAL_PRIMITIVE;</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">            return provider.sourceKind() == SearchMove.SourceKind.LEARNED ? Stage.VALUABLE_LEARNED</span>
+<span class="fc" id="L388">                : MovePriorityPolicy.INVENTORY_ORDER.stage(provider, state, context);</span>
         }
     }
 }

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PrimitiveSchemaReachability.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">PrimitiveSchemaReachability.java</span></div><h1>PrimitiveSchemaReachability.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.retention.RetainedOperation;
+import de.regelsuche.search.moves.MoveContext;
+import de.regelsuche.search.moves.MoveProvider;
+import de.regelsuche.search.moves.MoveState;
+import de.regelsuche.search.moves.TypedMoveSearch;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.TransformationWorkMetrics;
+
+/** Conservative whole-task proof over the exact primitive rewrite inventory installed in the solver. */
+final class PrimitiveSchemaReachability {
+    static final String REVISION = &quot;invariant-operator-absence/v1&quot;;
+<span class="fc" id="L17">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
+    private final CheckedLearnedSchemaModel model;
+    private final long required;
+    private final long compilationWork;
+    private final long patternVisits;
+
+<span class="fc" id="L23">    private PrimitiveSchemaReachability(CheckedLearnedSchemaModel model, long required, long compilationWork, long patternVisits) {</span>
+<span class="fc" id="L24">        this.model = model;</span>
+<span class="fc" id="L25">        this.required = required;</span>
+<span class="fc" id="L26">        this.compilationWork = compilationWork;</span>
+<span class="fc" id="L27">        this.patternVisits = patternVisits;</span>
+<span class="fc" id="L28">    }</span>
+
+    static PrimitiveSchemaReachability compile(EvolutionGenome inventory, CheckedLearnedSchemaModel model) {
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (BinaryOperator.values().length &gt; Long.SIZE) return new PrimitiveSchemaReachability(model, 0, 1, 0);</span>
+<span class="fc" id="L32">        var work = new CheckedSchemaSupport.Work();</span>
+<span class="fc" id="L33">        long introduced = 0;</span>
+<span class="fc" id="L34">        long parseWork = 0;</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        for (var gene : inventory.rewrites()) {</span>
+<span class="fc" id="L36">            parseWork += gene.sourcePattern().length() + gene.targetPattern().length() + 1L;</span>
+<span class="fc" id="L37">            long before = operators(EvolutionGenomeCompiler.parsePattern(gene.sourcePattern()), work);</span>
+<span class="fc" id="L38">            long after = operators(EvolutionGenomeCompiler.parsePattern(gene.targetPattern()), work);</span>
+<span class="fc" id="L39">            introduced |= after &amp; ~before;</span>
+<span class="fc" id="L40">        }</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        long common = model.schemas().isEmpty() ? 0 : ~0L;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (var schema : model.schemas()) common &amp;= operators(schema.source(), work);</span>
+        // A placeholder only copies subtrees from the matched input. A literal operator
+        // missing before the step can first appear only in an explicitly introducing RHS.
+<span class="fc" id="L45">        return new PrimitiveSchemaReachability(model, common &amp; ~introduced,</span>
+            // Copy the primitive list into the guarded session and prepare its fallback and receipt once.
+<span class="fc" id="L47">            parseWork + work.units + model.schemas().size() + 2L * inventory.rewrites().size() + 8, work.units);</span>
+    }
+
+    private static long operators(PatternExpr pattern, CheckedSchemaSupport.Work work) {
+<span class="fc" id="L51">        work.add(1);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Operation op)</span>
+<span class="fc" id="L53">            return bit(op.operator()) | operators(op.left(), work) | operators(op.right(), work);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.Function fn) {</span>
+<span class="nc" id="L55">            long result = 0;</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">            for (var argument : fn.arguments()) result |= operators(argument, work);</span>
+<span class="nc" id="L57">            return result;</span>
+        }
+<span class="fc" id="L59">        return 0;</span>
+    }
+
+<span class="fc" id="L62">    private static long bit(BinaryOperator operator) { return 1L &lt;&lt; operator.ordinal(); }</span>
+<span class="fc" id="L63">    long compilationWork() { return compilationWork; }</span>
+<span class="fc" id="L64">    long patternVisits() { return patternVisits; }</span>
+
+    /**
+     * Even an impossible schema reports an incomplete relation on an unsupported state.
+     * Keep this check on one primitive lane, also when a rewrite leaves the checked domain.
+     * An exhaustive expansion necessarily opens that lane. A quality stop is nonexhaustive.
+     */
+    TypedMoveSearch.TypedProvider withDomainCheck(MoveProvider primitive) {
+<span class="fc" id="L72">        return new TypedMoveSearch.TypedProvider() {</span>
+<span class="fc" id="L73">            @Override public Descriptor descriptor() { return primitive.descriptor(); }</span>
+            @Override public Batch candidates(MoveState state, MoveContext context) {
+<span class="fc" id="L75">                var batch = primitive.candidates(state, context);</span>
+<span class="fc" id="L76">                var work = new CheckedSchemaSupport.Work();</span>
+<span class="fc" id="L77">                work.add(1);</span>
+<span class="fc" id="L78">                var requiredAssumptions = model.requiredAssumptions();</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                if (!requiredAssumptions.isEmpty())</span>
+<span class="nc" id="L80">                    work.add(requiredAssumptions.size() + (long) context.initialAssumptions().size() + state.assumptions().size());</span>
+<span class="pc bpc" id="L81" title="3 of 4 branches missed.">                if (requiredAssumptions.isEmpty() || context.carries(requiredAssumptions, state)) {</span>
+<span class="fc" id="L82">                    boolean complete = batch.complete();</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                    if (state.expression().length() &gt; 262_144) complete = false;</span>
+                    else {
+                        try {
+<span class="fc" id="L86">                            CheckedSchemaSupport.domain(CODEC.decodeExpression(state.expression()), model.bounds(), work);</span>
+<span class="fc" id="L87">                        } catch (CheckedSchemaSupport.DomainRejected unsupported) {</span>
+<span class="fc" id="L88">                            complete = false;</span>
+<span class="fc" id="L89">                        }</span>
+                    }
+<span class="fc" id="L91">                    var cost = TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(work.units);</span>
+<span class="fc" id="L92">                    return new Batch(batch.moves(), batch.work().plus(cost), complete);</span>
+                }
+<span class="nc" id="L94">                return new Batch(batch.moves(), batch.work().plus(</span>
+<span class="nc" id="L95">                    TransformationWorkMetrics.ZERO.withDelegatedMechanicalWork(work.units)), batch.complete());</span>
+            }
+        };
+    }
+
+<span class="fc" id="L100">    record Decision(boolean primitiveOnly, int nodes, long work) {}</span>
+
+    static final class OperatorScan {
+        private long missing;
+        final int maximumNodes;
+<span class="fc" id="L105">        OperatorScan(long required, int maximumNodes) { this.missing = required; this.maximumNodes = maximumNodes; }</span>
+        void observe(BinaryOperator operator, CheckedSchemaSupport.Work work) {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            if (missing != 0) {</span>
+<span class="fc" id="L108">                work.add(1);</span>
+<span class="fc" id="L109">                missing &amp;= ~bit(operator);</span>
+            }
+<span class="fc" id="L111">        }</span>
+    }
+
+    Decision inspect(Expr source, long allowance) {
+<span class="pc bpc" id="L115" title="1 of 6 branches missed.">        if (required == 0 || allowance &lt; 7 || RetainedOperation.isObserved()) return new Decision(false, 0, 1);</span>
+<span class="fc" id="L116">        var work = new CheckedSchemaSupport.Work();</span>
+        // Four units create the query scanner, initialize its mask, select the solver and return the decision.
+        // One normal visit and at most one operator check per node, plus the final failed bound check.
+<span class="fc" id="L119">        work.add(4);</span>
+<span class="fc" id="L120">        int limit = (int) Math.min(model.bounds().maximumExpressionNodes(), (allowance - 5) / 2);</span>
+<span class="fc" id="L121">        var scan = new OperatorScan(required, limit);</span>
+        try {
+<span class="fc" id="L123">            int nodes = CheckedSchemaSupport.countedDomain(source, model.bounds(), work, false, scan);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            return new Decision(scan.missing != 0, nodes, work.units);</span>
+<span class="fc" id="L125">        } catch (CheckedSchemaSupport.DomainRejected inconclusive) {</span>
+<span class="fc" id="L126">            return new Decision(false, 0, work.units);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

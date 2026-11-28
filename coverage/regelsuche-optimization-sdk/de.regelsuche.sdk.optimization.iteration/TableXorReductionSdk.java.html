@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TableXorReductionSdk.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-optimization-sdk</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.sdk.optimization.iteration</a> &gt; <span class="el_source">TableXorReductionSdk.java</span></div><h1>TableXorReductionSdk.java</h1><pre class="source lang-java linenums">package de.regelsuche.sdk.optimization.iteration;
+
+import de.regelsuche.ast.iteration.TableXorReduction;
+import de.regelsuche.math.algorithms.iteration.BinaryByteFieldTable;
+import de.regelsuche.math.algorithms.iteration.OrderedInputPrefix;
+import de.regelsuche.math.algorithms.iteration.TableXorContraction;
+import java.util.List;
+import java.util.Optional;
+
+/** Portable representation, reference evaluation and optional field qualification of byte table reductions. */
+public final class TableXorReductionSdk {
+    private TableXorReductionSdk() {}
+
+    public static TableXorReduction describe(List&lt;TableXorReduction.Axis&gt; order, TableXorReduction.Storage storage) {
+<span class="fc" id="L15">        return new TableXorReduction(order, storage);</span>
+    }
+
+    public static byte[][] evaluate(TableXorReduction reduction, byte[][] table, byte[][] coefficients,
+                                    byte[][] inputs, int inputCount, int outputCount, int offset, int byteCount) {
+<span class="fc" id="L20">        return TableXorContraction.evaluate(reduction, table, coefficients, inputs,</span>
+                inputCount, outputCount, offset, byteCount);
+    }
+
+    public static Optional&lt;OrderedInputPrefix.Schedule&gt; orderedPrefixPlan(TableXorReduction reduction, int width) {
+<span class="fc" id="L25">        return OrderedInputPrefix.plan(reduction, width);</span>
+    }
+
+    public static boolean verifyOrderedPrefix(TableXorReduction reduction, OrderedInputPrefix.Schedule schedule) {
+<span class="fc" id="L29">        return OrderedInputPrefix.verify(reduction, schedule);</span>
+    }
+
+    public static Optional&lt;BinaryByteFieldTable.Verified&gt; verifyBinaryField(byte[][] table) {
+<span class="fc" id="L33">        return BinaryByteFieldTable.verify(table);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

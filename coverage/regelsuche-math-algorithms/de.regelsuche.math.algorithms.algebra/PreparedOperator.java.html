@@ -4,7 +4,8 @@ import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.math.algorithms.linalg.ExactMatrixExpression;
 import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
 import de.regelsuche.scalar.ExactRational;
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
@@ -19,46 +20,49 @@ public final class PreparedOperator {
     private final Cost directCost;
 
     private PreparedOperator(Plan plan, OperatorResidualSearch.Predictor predictor, int residualRank,
-<span class="fc" id="L22">                             Node program, Cost directCost) {</span>
-<span class="fc" id="L23">        this.plan = plan;</span>
-<span class="fc" id="L24">        this.predictor = predictor;</span>
-<span class="fc" id="L25">        this.residualRank = residualRank;</span>
-<span class="fc" id="L26">        this.program = program;</span>
-<span class="fc" id="L27">        this.directCost = directCost;</span>
-<span class="fc" id="L28">    }</span>
+<span class="fc" id="L23">                             Node program, Cost directCost) {</span>
+<span class="fc" id="L24">        this.plan = plan;</span>
+<span class="fc" id="L25">        this.predictor = predictor;</span>
+<span class="fc" id="L26">        this.residualRank = residualRank;</span>
+<span class="fc" id="L27">        this.program = program;</span>
+<span class="fc" id="L28">        this.directCost = directCost;</span>
+<span class="fc" id="L29">    }</span>
 
     /** The only construction path checks the complete source identity before compiling execution. */
     static PreparedOperator create(PolynomialMatrix source, Plan plan, OperatorResidualSearch.Predictor predictor,
                                     int rank, Cost directCost, OperatorChecks checks) {
-<span class="fc" id="L33">        OperatorResidualPlans.verify(source, plan, checks);</span>
-<span class="fc" id="L34">        Node program = compile(plan.expression(), checks);</span>
-<span class="fc" id="L35">        return new PreparedOperator(plan, predictor, rank, program,</span>
-<span class="fc bfc" id="L36" title="All 2 branches covered.">            directCost == null ? sparse(source, checks).cost() : directCost);</span>
+<span class="fc" id="L34">        OperatorResidualPlans.verify(source, plan, checks);</span>
+<span class="fc" id="L35">        Node program = compile(plan.expression(), checks);</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (directCost == null) {</span>
+            // Verification already identified this single matrix with the source, including for supplied plans.
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">            directCost = program instanceof Sparse || program instanceof Unit ? program.cost() : sparse(source, checks).cost();</span>
+        }
+<span class="fc" id="L40">        return new PreparedOperator(plan, predictor, rank, program, directCost);</span>
     }
 
-<span class="fc" id="L39">    public OperatorResidualSearch.Predictor predictor() { return predictor; }</span>
+<span class="fc" id="L43">    public OperatorResidualSearch.Predictor predictor() { return predictor; }</span>
     /** Correction width; equals residual rank for discovered factors, is only an upper bound for supplied ones. */
-<span class="fc" id="L41">    public int correctionWidth() { return residualRank; }</span>
-<span class="fc" id="L42">    public Plan plan() { return plan; }</span>
+<span class="fc" id="L45">    public int correctionWidth() { return residualRank; }</span>
+<span class="fc" id="L46">    public Plan plan() { return plan; }</span>
 
     /** Counts nonunit scalar products and staged additions; zero entries are omitted. */
-<span class="fc" id="L45">    public Cost cost() { return program.cost(); }</span>
-<span class="fc" id="L46">    public Cost directCost() { return directCost; }</span>
+<span class="fc" id="L49">    public Cost cost() { return program.cost(); }</span>
+<span class="fc" id="L50">    public Cost directCost() { return directCost; }</span>
 
     /** Replay a previously checked immutable program; acquisition is not repeated for each vector. */
     public Result&lt;List&lt;ExactRational&gt;&gt; apply(List&lt;ExactRational&gt; vector, IterationLimits limits,
                                            BooleanSupplier cancelled) {
-<span class="fc" id="L51">        return OperatorChecks.run(limits, cancelled, checks -&gt; {</span>
-<span class="pc bpc" id="L52" title="1 of 4 branches missed.">            need(vector != null &amp;&amp; vector.size() == program.columns(), &quot;VECTOR_DIMENSION_MISMATCH&quot;);</span>
-<span class="fc" id="L53">            checks.reserve(vector.size(), 1);</span>
-<span class="fc bfc" id="L54" title="All 2 branches covered.">            for (var value : vector) {</span>
-<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                need(value != null, &quot;MISSING_VECTOR_VALUE&quot;);</span>
-<span class="fc" id="L56">                checks.work.check(value);</span>
-<span class="fc" id="L57">            }</span>
-<span class="fc" id="L58">            var input = vector.toArray(ExactRational[]::new);</span>
-<span class="fc" id="L59">            var output = program.apply(input, checks);</span>
-<span class="fc" id="L60">            checks.reserve(output.length, 1);</span>
-<span class="fc" id="L61">            return List.of(output);</span>
+<span class="fc" id="L55">        return OperatorChecks.run(limits, cancelled, checks -&gt; {</span>
+<span class="pc bpc" id="L56" title="1 of 4 branches missed.">            need(vector != null &amp;&amp; vector.size() == program.columns(), &quot;VECTOR_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L57">            checks.reserve(vector.size(), 1);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            for (var value : vector) {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                need(value != null, &quot;MISSING_VECTOR_VALUE&quot;);</span>
+<span class="fc" id="L60">                checks.work.check(value);</span>
+<span class="fc" id="L61">            }</span>
+<span class="fc" id="L62">            var input = vector.toArray(ExactRational[]::new);</span>
+<span class="fc" id="L63">            var output = program.apply(input, checks);</span>
+<span class="fc" id="L64">            checks.reserve(output.length, 1);</span>
+<span class="fc" id="L65">            return List.of(output);</span>
         });
     }
 
@@ -69,106 +73,147 @@ public final class PreparedOperator {
         ExactRational[] apply(ExactRational[] input, OperatorChecks checks);
     }
 
-<span class="fc" id="L72">    private record Entry(int column, ExactRational coefficient) {}</span>
+<span class="fc" id="L76">    private record Scaling(int column, ExactRational coefficient) {}</span>
 
-<span class="fc" id="L74">    private record Sparse(int rows, int columns, List&lt;List&lt;Entry&gt;&gt; entries, Cost cost, boolean zero) implements Node {</span>
+    /** Assigns one register per distinct scaling, and a value slot only on its second use. */
+    private static final class ScalingRegisters {
+<span class="fc" id="L80">        final LinkedHashMap&lt;Scaling, Integer&gt; indices = new LinkedHashMap&lt;&gt;();</span>
+        final int[] slots;
+        int sharedCount;
+
+<span class="fc" id="L84">        ScalingRegisters(int maximumScalings) {</span>
+<span class="fc" id="L85">            slots = new int[maximumScalings];</span>
+<span class="fc" id="L86">            Arrays.fill(slots, -1);</span>
+<span class="fc" id="L87">        }</span>
+
+        int register(Scaling scaling) {
+<span class="fc" id="L90">            int next = indices.size();</span>
+<span class="fc" id="L91">            Integer existing = indices.putIfAbsent(scaling, next);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (existing == null) return next;</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (slots[existing] &lt; 0) slots[existing] = sharedCount++;</span>
+<span class="fc" id="L94">            return existing;</span>
+        }
+    }
+
+    /** Registers below columns refer to inputs; higher registers refer to exact scaled inputs. */
+<span class="fc" id="L99">    private record Sparse(int columns, int[][] rowRegisters, List&lt;Scaling&gt; scalings, int[] slots,</span>
+                          int sharedCount, Cost cost, boolean zero) implements Node {
+<span class="fc" id="L101">        @Override public int rows() { return rowRegisters.length; }</span>
+
         @Override public ExactRational[] apply(ExactRational[] input, OperatorChecks checks) {
-<span class="fc" id="L76">            checks.reserve(rows, 1);</span>
-<span class="fc" id="L77">            var output = new ExactRational[rows];</span>
-<span class="fc bfc" id="L78" title="All 2 branches covered.">            for (int row = 0; row &lt; rows; row++) {</span>
-<span class="fc" id="L79">                checks.work.charge(1);</span>
-<span class="fc" id="L80">                var sum = ExactRational.ZERO;</span>
-<span class="fc" id="L81">                boolean first = true;</span>
-<span class="fc bfc" id="L82" title="All 2 branches covered.">                for (var entry : entries.get(row)) {</span>
-<span class="fc" id="L83">                    checks.work.charge(1);</span>
-<span class="fc bfc" id="L84" title="All 2 branches covered.">                    var term = entry.coefficient().equals(ExactRational.ONE) ? input[entry.column()]</span>
-<span class="fc" id="L85">                        : checks.work.mul(entry.coefficient(), input[entry.column()]);</span>
-<span class="fc bfc" id="L86" title="All 2 branches covered.">                    sum = first ? term : checks.work.add(sum, term);</span>
-<span class="fc" id="L87">                    first = false;</span>
-<span class="fc" id="L88">                }</span>
-<span class="fc" id="L89">                output[row] = sum;</span>
+<span class="fc" id="L104">            checks.reserveCells(sharedCount);</span>
+<span class="fc" id="L105">            var shared = new ExactRational[sharedCount];</span>
+<span class="fc" id="L106">            checks.reserve(rows(), 1);</span>
+<span class="fc" id="L107">            var output = new ExactRational[rows()];</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            for (int row = 0; row &lt; rows(); row++) {</span>
+<span class="fc" id="L109">                checks.work.charge(1);</span>
+<span class="fc" id="L110">                ExactRational sum = null;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                for (int register : rowRegisters[row]) {</span>
+<span class="fc" id="L112">                    checks.work.charge(1);</span>
+<span class="fc" id="L113">                    var term = value(register, input, shared, checks);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                    sum = sum == null ? term : checks.work.add(sum, term);</span>
+                }
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                output[row] = sum == null ? ExactRational.ZERO : sum;</span>
             }
-<span class="fc" id="L91">            return output;</span>
+<span class="fc" id="L118">            return output;</span>
+        }
+
+        private ExactRational value(int register, ExactRational[] input, ExactRational[] shared, OperatorChecks checks) {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (register &lt; columns) return input[register];</span>
+<span class="fc" id="L123">            int index = register - columns;</span>
+<span class="fc" id="L124">            int slot = slots[index];</span>
+<span class="fc bfc" id="L125" title="All 4 branches covered.">            if (slot &gt;= 0 &amp;&amp; shared[slot] != null) return shared[slot];</span>
+<span class="fc" id="L126">            var scaling = scalings.get(index);</span>
+<span class="fc" id="L127">            var product = checks.work.mul(scaling.coefficient(), input[scaling.column()]);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (slot &gt;= 0) shared[slot] = product;</span>
+<span class="fc" id="L129">            return product;</span>
         }
     }
 
-<span class="fc" id="L95">    private record Unit(int rows) implements Node {</span>
-<span class="fc" id="L96">        @Override public int columns() { return rows; }</span>
-<span class="fc" id="L97">        @Override public Cost cost() { return new Cost(0, 0); }</span>
+<span class="fc" id="L133">    private record Unit(int rows) implements Node {</span>
+<span class="fc" id="L134">        @Override public int columns() { return rows; }</span>
+<span class="fc" id="L135">        @Override public Cost cost() { return new Cost(0, 0); }</span>
         @Override public ExactRational[] apply(ExactRational[] input, OperatorChecks checks) {
-<span class="fc" id="L99">            checks.work.charge(1);</span>
-<span class="fc" id="L100">            return input;</span>
+<span class="fc" id="L137">            checks.work.charge(1);</span>
+<span class="fc" id="L138">            return input;</span>
         }
     }
 
-<span class="fc" id="L104">    private record Composition(Node left, Node right) implements Node {</span>
-<span class="nc" id="L105">        @Override public int rows() { return left.rows(); }</span>
-<span class="fc" id="L106">        @Override public int columns() { return right.columns(); }</span>
-<span class="fc" id="L107">        @Override public Cost cost() { return left.cost().plus(right.cost()); }</span>
+<span class="fc" id="L142">    private record Composition(Node left, Node right) implements Node {</span>
+<span class="nc" id="L143">        @Override public int rows() { return left.rows(); }</span>
+<span class="fc" id="L144">        @Override public int columns() { return right.columns(); }</span>
+<span class="fc" id="L145">        @Override public Cost cost() { return left.cost().plus(right.cost()); }</span>
         @Override public ExactRational[] apply(ExactRational[] input, OperatorChecks checks) {
-<span class="fc" id="L109">            checks.work.charge(1);</span>
-<span class="fc" id="L110">            return left.apply(right.apply(input, checks), checks);</span>
+<span class="fc" id="L147">            checks.work.charge(1);</span>
+<span class="fc" id="L148">            return left.apply(right.apply(input, checks), checks);</span>
         }
     }
 
-<span class="fc" id="L114">    private record Addition(Node left, Node right) implements Node {</span>
-<span class="fc" id="L115">        @Override public int rows() { return left.rows(); }</span>
-<span class="fc" id="L116">        @Override public int columns() { return left.columns(); }</span>
-<span class="fc" id="L117">        @Override public Cost cost() { return left.cost().plus(right.cost()).updates(rows()); }</span>
+<span class="fc" id="L152">    private record Addition(Node left, Node right) implements Node {</span>
+<span class="fc" id="L153">        @Override public int rows() { return left.rows(); }</span>
+<span class="fc" id="L154">        @Override public int columns() { return left.columns(); }</span>
+<span class="fc" id="L155">        @Override public Cost cost() { return left.cost().plus(right.cost()).updates(rows()); }</span>
         @Override public ExactRational[] apply(ExactRational[] input, OperatorChecks checks) {
-<span class="fc" id="L119">            checks.work.charge(1);</span>
-<span class="fc" id="L120">            var a = left.apply(input, checks);</span>
-<span class="fc" id="L121">            var b = right.apply(input, checks);</span>
-<span class="fc" id="L122">            checks.reserve(rows(), 1);</span>
-<span class="fc" id="L123">            var output = new ExactRational[rows()];</span>
-<span class="fc bfc" id="L124" title="All 2 branches covered.">            for (int row = 0; row &lt; rows(); row++) output[row] = checks.work.add(a[row], b[row]);</span>
-<span class="fc" id="L125">            return output;</span>
+<span class="fc" id="L157">            checks.work.charge(1);</span>
+<span class="fc" id="L158">            var a = left.apply(input, checks);</span>
+<span class="fc" id="L159">            var b = right.apply(input, checks);</span>
+<span class="fc" id="L160">            checks.reserve(rows(), 1);</span>
+<span class="fc" id="L161">            var output = new ExactRational[rows()];</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            for (int row = 0; row &lt; rows(); row++) output[row] = checks.work.add(a[row], b[row]);</span>
+<span class="fc" id="L163">            return output;</span>
         }
     }
 
     static Node compile(ExactMatrixExpression expression, OperatorChecks checks) {
-<span class="fc" id="L130">        checks.work.charge(1);</span>
-<span class="fc" id="L131">        checks.reserve(1, 1);</span>
-<span class="pc bpc" id="L132" title="1 of 5 branches missed.">        return switch (expression) {</span>
-<span class="fc" id="L133">            case ExactMatrixExpression.Matrix matrix -&gt; sparse(matrix.value(), checks);</span>
-<span class="fc" id="L134">            case ExactMatrixExpression.Identity identity -&gt; new Unit(identity.dimension());</span>
-<span class="fc" id="L135">            case ExactMatrixExpression.Product product -&gt;</span>
-<span class="fc" id="L136">                new Composition(compile(product.left(), checks), compile(product.right(), checks));</span>
-<span class="fc" id="L137">            case ExactMatrixExpression.Sum sum -&gt; {</span>
-<span class="fc" id="L138">                var a = compile(sum.left(), checks);</span>
-<span class="fc" id="L139">                var b = compile(sum.right(), checks);</span>
-<span class="fc bfc" id="L140" title="All 4 branches covered.">                if (a instanceof Sparse sparse &amp;&amp; sparse.zero()) yield b;</span>
-<span class="pc bpc" id="L141" title="3 of 4 branches missed.">                if (b instanceof Sparse sparse &amp;&amp; sparse.zero()) yield a;</span>
-<span class="fc" id="L142">                yield new Addition(a, b);</span>
+<span class="fc" id="L168">        checks.work.charge(1);</span>
+<span class="fc" id="L169">        checks.reserve(1, 1);</span>
+<span class="pc bpc" id="L170" title="1 of 5 branches missed.">        return switch (expression) {</span>
+<span class="fc" id="L171">            case ExactMatrixExpression.Matrix matrix -&gt; sparse(matrix.value(), checks);</span>
+<span class="fc" id="L172">            case ExactMatrixExpression.Identity identity -&gt; new Unit(identity.dimension());</span>
+<span class="fc" id="L173">            case ExactMatrixExpression.Product product -&gt;</span>
+<span class="fc" id="L174">                new Composition(compile(product.left(), checks), compile(product.right(), checks));</span>
+<span class="fc" id="L175">            case ExactMatrixExpression.Sum sum -&gt; {</span>
+<span class="fc" id="L176">                var a = compile(sum.left(), checks);</span>
+<span class="fc" id="L177">                var b = compile(sum.right(), checks);</span>
+<span class="fc bfc" id="L178" title="All 4 branches covered.">                if (a instanceof Sparse sparse &amp;&amp; sparse.zero()) yield b;</span>
+<span class="pc bpc" id="L179" title="3 of 4 branches missed.">                if (b instanceof Sparse sparse &amp;&amp; sparse.zero()) yield a;</span>
+<span class="fc" id="L180">                yield new Addition(a, b);</span>
             }
-<span class="nc" id="L144">            default -&gt; throw new OperatorChecks.Rejected(Status.UNSUPPORTED, &quot;UNSUPPORTED_OPERATOR_SYNTAX&quot;);</span>
+<span class="nc" id="L182">            default -&gt; throw new OperatorChecks.Rejected(Status.UNSUPPORTED, &quot;UNSUPPORTED_OPERATOR_SYNTAX&quot;);</span>
         };
     }
 
     private static Sparse sparse(PolynomialMatrix matrix, OperatorChecks checks) {
-<span class="fc" id="L149">        checks.reserve(matrix.rows(), 1);</span>
-        // Mutable lists, immutable snapshots and each (column, rational) entry.
-<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (int part = 0; part &lt; 4; part++) checks.reserve(matrix.rows(), matrix.columns());</span>
-<span class="fc" id="L152">        var rows = new ArrayList&lt;List&lt;Entry&gt;&gt;(matrix.rows());</span>
-<span class="fc" id="L153">        long multiplies = 0;</span>
-<span class="fc" id="L154">        long additions = 0;</span>
-<span class="fc" id="L155">        boolean zero = true;</span>
-<span class="fc bfc" id="L156" title="All 2 branches covered.">        for (int row = 0; row &lt; matrix.rows(); row++) {</span>
-<span class="fc" id="L157">            var entries = new ArrayList&lt;Entry&gt;();</span>
-<span class="fc bfc" id="L158" title="All 2 branches covered.">            for (int column = 0; column &lt; matrix.columns(); column++) {</span>
-<span class="fc" id="L159">                checks.work.charge(1);</span>
-<span class="fc" id="L160">                var value = matrix.get(row, column);</span>
-<span class="fc bfc" id="L161" title="All 2 branches covered.">                if (value.isZero()) continue;</span>
-<span class="fc" id="L162">                var rational = value.terms().values().iterator().next();</span>
-<span class="fc" id="L163">                var coefficient = checks.work.check(new ExactRational(rational.numerator(), rational.denominator()));</span>
-<span class="fc" id="L164">                entries.add(new Entry(column, coefficient));</span>
-<span class="fc bfc" id="L165" title="All 2 branches covered.">                if (!coefficient.equals(ExactRational.ONE)) multiplies++;</span>
-<span class="fc" id="L166">                zero = false;</span>
+<span class="fc" id="L187">        checks.reserve(matrix.rows(), 1);</span>
+<span class="fc" id="L188">        checks.reserve(1, matrix.columns());</span>
+        // Row registers, scaling descriptors, insertion-ordered lookup and immutable scaling table.
+<span class="fc" id="L190">        checks.reserveCells(8L * matrix.rows() * matrix.columns());</span>
+<span class="fc" id="L191">        var rows = new int[matrix.rows()][];</span>
+<span class="fc" id="L192">        var rowBuffer = new int[matrix.columns()];</span>
+<span class="fc" id="L193">        var scalings = new ScalingRegisters(matrix.rows() * matrix.columns());</span>
+<span class="fc" id="L194">        long additions = 0;</span>
+<span class="fc" id="L195">        boolean zero = true;</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        for (int row = 0; row &lt; matrix.rows(); row++) {</span>
+<span class="fc" id="L197">            int used = 0;</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            for (int column = 0; column &lt; matrix.columns(); column++) {</span>
+<span class="fc" id="L199">                checks.work.charge(1);</span>
+<span class="fc" id="L200">                var value = matrix.get(row, column);</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">                if (value.isZero()) continue;</span>
+<span class="fc" id="L202">                var rational = value.terms().values().iterator().next();</span>
+<span class="fc" id="L203">                var coefficient = checks.work.check(new ExactRational(rational.numerator(), rational.denominator()));</span>
+<span class="fc" id="L204">                int register = column;</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                if (!coefficient.isOne()) {</span>
+<span class="fc" id="L206">                    register = matrix.columns() + scalings.register(new Scaling(column, coefficient));</span>
+                }
+<span class="fc" id="L208">                rowBuffer[used++] = register;</span>
             }
-<span class="fc" id="L168">            additions += Math.max(0, entries.size() - 1);</span>
-<span class="fc" id="L169">            rows.add(List.copyOf(entries));</span>
+<span class="fc" id="L210">            additions += Math.max(0, used - 1);</span>
+<span class="fc" id="L211">            rows[row] = Arrays.copyOf(rowBuffer, used);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            if (used != 0) zero = false;</span>
         }
-<span class="fc" id="L171">        return new Sparse(matrix.rows(), matrix.columns(), List.copyOf(rows), new Cost(multiplies, additions), zero);</span>
+<span class="fc" id="L214">        int products = scalings.indices.size();</span>
+<span class="fc" id="L215">        return new Sparse(matrix.columns(), rows, List.copyOf(scalings.indices.keySet()),</span>
+<span class="fc" id="L216">            Arrays.copyOf(scalings.slots, products), scalings.sharedCount, new Cost(products, additions), zero);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

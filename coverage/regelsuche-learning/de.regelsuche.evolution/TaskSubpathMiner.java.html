@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TaskSubpathMiner.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">TaskSubpathMiner.java</span></div><h1>TaskSubpathMiner.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.search.moves.SearchMove;
+import de.regelsuche.search.moves.TypedMoveSearch;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+
+/** Bounded projection of solver-issued, independently replayed task witnesses onto unchanged AST contexts. */
+final class TaskSubpathMiner {
+    private TaskSubpathMiner() { }
+
+    @FunctionalInterface
+    interface Sink {
+        void accept(String location, Expr source, Expr target);
+    }
+
+<span class="fc" id="L20">    private record Step(Expr before, Expr after, int index, boolean primitive) {</span>
+<span class="fc" id="L21">        Step project(Expr source, Expr target) { return new Step(source, target, index, primitive); }</span>
+    }
+<span class="fc" id="L23">    private record Trace(String path, List&lt;Step&gt; steps) { }</span>
+
+    /** Returns false when the bounded inventory of possible training observations was truncated. */
+    static boolean mine(List&lt;TypedMoveSearch.WitnessStep&gt; witness, CheckedLearnedSchemaModel.Bounds bounds,
+            int allowance, CheckedSchemaSupport.Work work, Sink sink) {
+<span class="fc" id="L28">        work.add(1);</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (witness.size() &gt; bounds.maximumExamples()) return false;</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (witness.size() &lt; 3) return true;</span>
+<span class="fc" id="L31">        var steps = new ArrayList&lt;Step&gt;();</span>
+<span class="fc" id="L32">        CheckedSchemaSupport.domain(witness.getFirst().source().expression(), bounds, work);</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        for (var edge : witness) {</span>
+<span class="fc" id="L34">            Expr target = edge.target().expression();</span>
+<span class="fc" id="L35">            CheckedSchemaSupport.domain(target, bounds, work);</span>
+<span class="fc" id="L36">            var move = edge.move();</span>
+<span class="fc" id="L37">            steps.add(new Step(edge.source().expression(), target, steps.size(),</span>
+<span class="pc bpc" id="L38" title="2 of 4 branches missed.">                move.sourceKind() == SearchMove.SourceKind.PRIMITIVE &amp;&amp; move.assumptions().isEmpty()</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">                &amp;&amp; edge.verification().accepted()));</span>
+<span class="fc" id="L40">            work.add(1);</span>
+<span class="fc" id="L41">        }</span>
+<span class="fc" id="L42">        var root = new Trace(&quot;&quot;, steps);</span>
+<span class="fc" id="L43">        var scopes = new ArrayList&lt;Trace&gt;();</span>
+<span class="fc" id="L44">        collectScopes(root, scopes, work);</span>
+<span class="fc" id="L45">        return inspect(root, scopes, allowance, work, sink);</span>
+    }
+
+    /**
+     * Follow only transitions with the same enclosing operator and exactly one changed
+     * child. A step wholly in the sibling becomes a stutter; a change at the common
+     * ancestor ends a projection segment. Keeping original indices binds interleaved work.
+     */
+    private static void collectScopes(Trace trace, List&lt;Trace&gt; scopes, CheckedSchemaSupport.Work work) {
+<span class="fc" id="L54">        var left = new ArrayList&lt;Step&gt;();</span>
+<span class="fc" id="L55">        var right = new ArrayList&lt;Step&gt;();</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        for (var step : trace.steps()) {</span>
+<span class="fc" id="L57">            work.add(1);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            if (projectIndependentStep(step, left, right)) continue;</span>
+<span class="fc" id="L59">            collectChild(trace.path() + &quot;L&quot;, left, scopes, work);</span>
+<span class="fc" id="L60">            collectChild(trace.path() + &quot;R&quot;, right, scopes, work);</span>
+<span class="fc" id="L61">            left = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L62">            right = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">        collectChild(trace.path() + &quot;L&quot;, left, scopes, work);</span>
+<span class="fc" id="L65">        collectChild(trace.path() + &quot;R&quot;, right, scopes, work);</span>
+<span class="fc" id="L66">    }</span>
+
+    private static boolean projectIndependentStep(Step step, List&lt;Step&gt; left, List&lt;Step&gt; right) {
+<span class="fc bfc" id="L69" title="All 4 branches covered.">        if (!(step.before() instanceof BinaryExpr before) || !(step.after() instanceof BinaryExpr after)</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                || before.operator() != after.operator()) return false;</span>
+<span class="fc" id="L71">        boolean sameLeft = before.left().equals(after.left());</span>
+<span class="fc" id="L72">        boolean sameRight = before.right().equals(after.right());</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (sameLeft == sameRight) return false;</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (sameLeft) right.add(step.project(before.right(), after.right()));</span>
+<span class="fc" id="L75">        else left.add(step.project(before.left(), after.left()));</span>
+<span class="fc" id="L76">        return true;</span>
+    }
+
+    private static void collectChild(String path, List&lt;Step&gt; steps, List&lt;Trace&gt; scopes, CheckedSchemaSupport.Work work) {
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (steps.size() &lt; 2) return;</span>
+<span class="fc" id="L81">        var trace = new Trace(path, steps);</span>
+<span class="fc" id="L82">        scopes.add(trace);</span>
+<span class="fc" id="L83">        collectScopes(trace, scopes, work);</span>
+<span class="fc" id="L84">    }</span>
+
+    private static boolean inspect(Trace root, List&lt;Trace&gt; scopes, int allowance,
+            CheckedSchemaSupport.Work work, Sink sink) {
+        // Whole projected subproblems first. Preserve remaining capacity for proper windows.
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (var trace : scopes) {</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            if (allowance-- == 0) return false;</span>
+<span class="fc" id="L91">            observe(trace, 0, trace.steps().size(), work, sink);</span>
+<span class="fc" id="L92">        }</span>
+<span class="fc" id="L93">        scopes.add(root);</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (int width = 2; width &lt; root.steps().size(); width++) {</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            for (var trace : scopes) {</span>
+<span class="fc" id="L96">                work.add(1);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                if (width &gt;= trace.steps().size()) continue;</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                for (int start = 0; start &lt;= trace.steps().size() - width; start++) {</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                    if (allowance-- == 0) return false;</span>
+<span class="fc" id="L100">                    observe(trace, start, start + width, work, sink);</span>
+                }
+<span class="fc" id="L102">            }</span>
+        }
+<span class="fc" id="L104">        return true;</span>
+    }
+
+    private static void observe(Trace trace, int start, int end, CheckedSchemaSupport.Work work, Sink sink) {
+<span class="fc" id="L108">        var steps = trace.steps();</span>
+<span class="fc" id="L109">        Expr source = steps.get(start).before();</span>
+<span class="fc" id="L110">        var visited = new HashSet&lt;Expr&gt;();</span>
+<span class="fc" id="L111">        visited.add(source);</span>
+<span class="fc" id="L112">        var location = new StringBuilder(trace.path()).append('[');</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (var step : steps.subList(start, end)) {</span>
+<span class="fc" id="L114">            work.add(1);</span>
+<span class="fc bfc" id="L115" title="All 4 branches covered.">            if (!step.primitive() || !visited.add(step.after())) return;</span>
+<span class="fc" id="L116">            location.append(step.index()).append(',');</span>
+<span class="fc" id="L117">        }</span>
+<span class="fc" id="L118">        String origin = location.append(']').toString();</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (origin.length() &gt; 400) {</span>
+            // The persisted support ID also contains its lesson and lineage. Preserve all
+            // original indices in at most 128 bits under the snapshot's 512-character limit.
+<span class="nc" id="L122">            var mask = java.math.BigInteger.ZERO;</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">            for (var step : steps.subList(start, end)) mask = mask.setBit(step.index());</span>
+<span class="nc" id="L124">            work.add(end - start);</span>
+<span class="nc" id="L125">            origin = trace.path() + &quot;[indices=0x&quot; + mask.toString(16) + &quot;]&quot;;</span>
+        }
+<span class="fc" id="L127">        sink.accept(origin, source, steps.get(end - 1).after());</span>
+<span class="fc" id="L128">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

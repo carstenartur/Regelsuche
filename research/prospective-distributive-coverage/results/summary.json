@@ -1,0 +1,388 @@
+{
+  "rowsPerRotation": 1224,
+  "witnesses": 121,
+  "rawSha256": [
+    {
+      "rows.jsonl": "34507eeb4ed9129061ad699fa60b2007bebb12388bc915268ae26a3c4008b891",
+      "paths.json": "ea5bfc243dbc0d46ba2eef88cb874dbb9ecd7c2cbf13418ccc25a5f662cc8203",
+      "split.json": "1aef46672d0957b567ccc25b0625d28954005b2821a9d6f35020e4e0da02d7f7",
+      "times.json": "0d672bdc54a1531dd903e19b80e0c16280e88bcf498ea8e7cf188edeac116ea1"
+    },
+    {
+      "rows.jsonl": "401f5a75501277d128c52db6f3b828a7af686b4e88ff48026e5b08673752484f",
+      "paths.json": "ea5bfc243dbc0d46ba2eef88cb874dbb9ecd7c2cbf13418ccc25a5f662cc8203",
+      "split.json": "1aef46672d0957b567ccc25b0625d28954005b2821a9d6f35020e4e0da02d7f7",
+      "times.json": "6332134fd151d6869bfcc33176f2f3a6d2587133caa231f107d78ddbb81246be"
+    }
+  ],
+  "timings": [
+    [
+      {
+        "arm": "BASE",
+        "acquisition": 0,
+        "loadAndPrepare": 0,
+        "elapsedNanos": 1434517035,
+        "threadCpuNanos": 1345110771
+      },
+      {
+        "arm": "LEARNED",
+        "acquisition": 9130,
+        "loadAndPrepare": 3675,
+        "elapsedNanos": 1301067235,
+        "threadCpuNanos": 1211193899
+      },
+      {
+        "arm": "DROP",
+        "acquisition": 9130,
+        "loadAndPrepare": 3675,
+        "elapsedNanos": 663471102,
+        "threadCpuNanos": 642604998
+      }
+    ],
+    [
+      {
+        "arm": "DROP",
+        "acquisition": 9130,
+        "loadAndPrepare": 3675,
+        "elapsedNanos": 2061474282,
+        "threadCpuNanos": 1780401616
+      },
+      {
+        "arm": "LEARNED",
+        "acquisition": 9130,
+        "loadAndPrepare": 3675,
+        "elapsedNanos": 1397275227,
+        "threadCpuNanos": 1193454179
+      },
+      {
+        "arm": "BASE",
+        "acquisition": 0,
+        "loadAndPrepare": 0,
+        "elapsedNanos": 751788715,
+        "threadCpuNanos": 602879048
+      }
+    ]
+  ],
+  "alphaOverlaps": {
+    "regelsuche.exact-polynomial-analysis/v1:v0 + 2": [
+      "FINAL/negative/2",
+      "FINAL/neutral/2"
+    ],
+    "regelsuche.exact-polynomial-analysis/v1:v0 + 3": [
+      "FINAL/negative/3",
+      "FINAL/neutral/3"
+    ],
+    "regelsuche.exact-polynomial-analysis/v1:v0 + 5": [
+      "FINAL/negative/5",
+      "FINAL/neutral/5"
+    ],
+    "regelsuche.exact-polynomial-analysis/v1:v0 + 7": [
+      "FINAL/negative/7",
+      "FINAL/neutral/7"
+    ]
+  },
+  "crossSplitAlphaOverlaps": {},
+  "sweptCoverage": {
+    "BASE": 220,
+    "LEARNED": 200,
+    "DROP": 208
+  },
+  "pairwiseCoverage": {
+    "BASE": {
+      "wins": 0,
+      "losses": 20
+    },
+    "DROP": {
+      "wins": 4,
+      "losses": 12
+    }
+  },
+  "qualifyingBudgets": {
+    "parallel": [],
+    "serial": [],
+    "normalize": []
+  },
+  "primaryCriterion": false,
+  "families": {
+    "parallel": {
+      "swept": {
+        "BASE": 36,
+        "LEARNED": 36,
+        "DROP": 32
+      },
+      "reference": {
+        "BASE": 4,
+        "LEARNED": 4,
+        "DROP": 4
+      }
+    },
+    "serial": {
+      "swept": {
+        "BASE": 36,
+        "LEARNED": 36,
+        "DROP": 36
+      },
+      "reference": {
+        "BASE": 4,
+        "LEARNED": 4,
+        "DROP": 4
+      }
+    },
+    "normalize": {
+      "swept": {
+        "BASE": 44,
+        "LEARNED": 36,
+        "DROP": 40
+      },
+      "reference": {
+        "BASE": 4,
+        "LEARNED": 4,
+        "DROP": 4
+      }
+    },
+    "mirrored": {
+      "swept": {
+        "BASE": 44,
+        "LEARNED": 36,
+        "DROP": 44
+      },
+      "reference": {
+        "BASE": 4,
+        "LEARNED": 4,
+        "DROP": 4
+      }
+    },
+    "neutral": {
+      "swept": {
+        "BASE": 60,
+        "LEARNED": 56,
+        "DROP": 56
+      },
+      "reference": {
+        "BASE": 4,
+        "LEARNED": 4,
+        "DROP": 4
+      }
+    },
+    "negative": {
+      "swept": {
+        "BASE": 0,
+        "LEARNED": 0,
+        "DROP": 0
+      },
+      "reference": {
+        "BASE": 0,
+        "LEARNED": 0,
+        "DROP": 0
+      }
+    }
+  },
+  "referenceQueryWork": {
+    "BASE": {
+      "parallel": [
+        636,
+        636,
+        636,
+        636
+      ],
+      "serial": [
+        584,
+        584,
+        584,
+        584
+      ],
+      "normalize": [
+        311,
+        311,
+        311,
+        311
+      ],
+      "mirrored": [
+        266,
+        266,
+        266,
+        266
+      ],
+      "neutral": [
+        88,
+        88,
+        88,
+        88
+      ],
+      "negative": [
+        32,
+        32,
+        32,
+        32
+      ]
+    },
+    "LEARNED": {
+      "parallel": [
+        543,
+        543,
+        543,
+        543
+      ],
+      "serial": [
+        552,
+        552,
+        552,
+        552
+      ],
+      "normalize": [
+        548,
+        548,
+        548,
+        548
+      ],
+      "mirrored": [
+        587,
+        587,
+        587,
+        587
+      ],
+      "neutral": [
+        109,
+        109,
+        109,
+        109
+      ],
+      "negative": [
+        41,
+        41,
+        41,
+        41
+      ]
+    },
+    "DROP": {
+      "parallel": [
+        790,
+        790,
+        790,
+        790
+      ],
+      "serial": [
+        740,
+        740,
+        740,
+        740
+      ],
+      "normalize": [
+        410,
+        410,
+        410,
+        410
+      ],
+      "mirrored": [
+        367,
+        367,
+        367,
+        367
+      ],
+      "neutral": [
+        109,
+        109,
+        109,
+        109
+      ],
+      "negative": [
+        41,
+        41,
+        41,
+        41
+      ]
+    }
+  },
+  "byBudget": {
+    "64": {
+      "BASE": 0,
+      "LEARNED": 0,
+      "DROP": 0
+    },
+    "96": {
+      "BASE": 4,
+      "LEARNED": 0,
+      "DROP": 0
+    },
+    "128": {
+      "BASE": 4,
+      "LEARNED": 4,
+      "DROP": 4
+    },
+    "192": {
+      "BASE": 4,
+      "LEARNED": 4,
+      "DROP": 4
+    },
+    "256": {
+      "BASE": 4,
+      "LEARNED": 4,
+      "DROP": 4
+    },
+    "384": {
+      "BASE": 12,
+      "LEARNED": 4,
+      "DROP": 8
+    },
+    "512": {
+      "BASE": 12,
+      "LEARNED": 4,
+      "DROP": 12
+    },
+    "768": {
+      "BASE": 20,
+      "LEARNED": 20,
+      "DROP": 16
+    },
+    "1024": {
+      "BASE": 20,
+      "LEARNED": 20,
+      "DROP": 20
+    },
+    "1536": {
+      "BASE": 20,
+      "LEARNED": 20,
+      "DROP": 20
+    },
+    "2048": {
+      "BASE": 20,
+      "LEARNED": 20,
+      "DROP": 20
+    },
+    "3072": {
+      "BASE": 20,
+      "LEARNED": 20,
+      "DROP": 20
+    },
+    "4096": {
+      "BASE": 20,
+      "LEARNED": 20,
+      "DROP": 20
+    },
+    "6144": {
+      "BASE": 20,
+      "LEARNED": 20,
+      "DROP": 20
+    },
+    "8192": {
+      "BASE": 20,
+      "LEARNED": 20,
+      "DROP": 20
+    },
+    "12288": {
+      "BASE": 20,
+      "LEARNED": 20,
+      "DROP": 20
+    },
+    "200000": {
+      "BASE": 20,
+      "LEARNED": 20,
+      "DROP": 20
+    }
+  },
+  "overBudgetRows": {
+    "BASE": 100,
+    "LEARNED": 120,
+    "DROP": 112
+  }
+}

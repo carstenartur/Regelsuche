@@ -130,62 +130,68 @@ import java.util.TreeMap;
 <span class="nc bnc" id="L130" title="All 2 branches missed.">            &amp;&amp; service.proportionalEquationDifferences(expressions.render(first), expressions.render(second));</span>
     }
 
+    /** Exact positive rescaling of directed differences, without assuming any premises. */
+    public boolean positivelyProportionalDifferences(Expression first, Expression second) {
+<span class="nc bnc" id="L135" title="All 4 branches missed.">        return isPolynomial(first) &amp;&amp; isPolynomial(second)</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            &amp;&amp; service.positivelyProportionalDifferences(expressions.render(first), expressions.render(second));</span>
+    }
+
     private static String canonicalPayload(Map&lt;String, Object&gt; payload) {
-<span class="fc" id="L134">        TreeMap&lt;String, String&gt; ordered = new TreeMap&lt;&gt;();</span>
-<span class="fc" id="L135">        payload.forEach((key, value) -&gt; ordered.put(</span>
-<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            key, value == null ? &quot;&quot; : value.toString()));</span>
-<span class="fc" id="L137">        return ordered.entrySet().stream()</span>
-<span class="fc" id="L138">            .map(entry -&gt; entry.getKey() + '=' + entry.getValue())</span>
-<span class="fc" id="L139">            .collect(java.util.stream.Collectors.joining(&quot;\n&quot;));</span>
+<span class="fc" id="L140">        TreeMap&lt;String, String&gt; ordered = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L141">        payload.forEach((key, value) -&gt; ordered.put(</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            key, value == null ? &quot;&quot; : value.toString()));</span>
+<span class="fc" id="L143">        return ordered.entrySet().stream()</span>
+<span class="fc" id="L144">            .map(entry -&gt; entry.getKey() + '=' + entry.getValue())</span>
+<span class="fc" id="L145">            .collect(java.util.stream.Collectors.joining(&quot;\n&quot;));</span>
     }
 
     private static ResultStatus status(
         ExecutionStatus executionStatus,
         ResultType resultType
     ) {
-<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (executionStatus != ExecutionStatus.SUCCESS) {</span>
-<span class="nc bnc" id="L147" title="All 3 branches missed.">            return switch (executionStatus) {</span>
-<span class="nc" id="L148">                case BUDGET_EXHAUSTED -&gt; ResultStatus.TIMEOUT;</span>
-<span class="nc" id="L149">                case UNKNOWN -&gt; ResultStatus.UNKNOWN;</span>
-<span class="nc" id="L150">                case DISABLED, UNAVAILABLE, SUCCESS -&gt; throw new IllegalStateException(</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (executionStatus != ExecutionStatus.SUCCESS) {</span>
+<span class="nc bnc" id="L153" title="All 3 branches missed.">            return switch (executionStatus) {</span>
+<span class="nc" id="L154">                case BUDGET_EXHAUSTED -&gt; ResultStatus.TIMEOUT;</span>
+<span class="nc" id="L155">                case UNKNOWN -&gt; ResultStatus.UNKNOWN;</span>
+<span class="nc" id="L156">                case DISABLED, UNAVAILABLE, SUCCESS -&gt; throw new IllegalStateException(</span>
                     &quot;execution status must be handled before result classification&quot;);
             };
         }
-<span class="pc bpc" id="L154" title="1 of 3 branches missed.">        return switch (resultType) {</span>
-<span class="fc" id="L155">            case PROOF -&gt; ResultStatus.CONFIRMED;</span>
-<span class="fc" id="L156">            case REFUTATION -&gt; ResultStatus.REFUTED;</span>
-<span class="nc" id="L157">            case HYPOTHESIS, DIAGNOSTIC -&gt; ResultStatus.UNKNOWN;</span>
+<span class="pc bpc" id="L160" title="1 of 3 branches missed.">        return switch (resultType) {</span>
+<span class="fc" id="L161">            case PROOF -&gt; ResultStatus.CONFIRMED;</span>
+<span class="fc" id="L162">            case REFUTATION -&gt; ResultStatus.REFUTED;</span>
+<span class="nc" id="L163">            case HYPOTHESIS, DIAGNOSTIC -&gt; ResultStatus.UNKNOWN;</span>
         };
     }
 
     private static boolean isPolynomial(Expression expression) {
-<span class="fc bfc" id="L162" title="All 4 branches covered.">        if (expression instanceof Literal || expression instanceof SolverIr.Symbol) {</span>
-<span class="fc" id="L163">            return true;</span>
+<span class="fc bfc" id="L168" title="All 4 branches covered.">        if (expression instanceof Literal || expression instanceof SolverIr.Symbol) {</span>
+<span class="fc" id="L169">            return true;</span>
         }
-<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (!(expression instanceof Binary binary)) {</span>
-<span class="fc" id="L166">            return false;</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (!(expression instanceof Binary binary)) {</span>
+<span class="fc" id="L172">            return false;</span>
         }
-<span class="pc bpc" id="L168" title="1 of 4 branches missed.">        if (!isPolynomial(binary.left()) || !isPolynomial(binary.right())) {</span>
-<span class="fc" id="L169">            return false;</span>
+<span class="pc bpc" id="L174" title="1 of 4 branches missed.">        if (!isPolynomial(binary.left()) || !isPolynomial(binary.right())) {</span>
+<span class="fc" id="L175">            return false;</span>
         }
-<span class="fc bfc" id="L171" title="All 3 branches covered.">        return switch (binary.operator()) {</span>
-<span class="fc" id="L172">            case ADD, SUBTRACT, MULTIPLY -&gt; true;</span>
-<span class="fc" id="L173">            case DIVIDE -&gt; false;</span>
-<span class="fc" id="L174">            case POWER -&gt; nonNegativeIntegerExponent(binary.right());</span>
+<span class="fc bfc" id="L177" title="All 3 branches covered.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L178">            case ADD, SUBTRACT, MULTIPLY -&gt; true;</span>
+<span class="fc" id="L179">            case DIVIDE -&gt; false;</span>
+<span class="fc" id="L180">            case POWER -&gt; nonNegativeIntegerExponent(binary.right());</span>
         };
     }
 
     private static boolean nonNegativeIntegerExponent(Expression expression) {
-<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (!(expression instanceof Literal literal)) {</span>
-<span class="nc" id="L180">            return false;</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (!(expression instanceof Literal literal)) {</span>
+<span class="nc" id="L186">            return false;</span>
         }
         try {
-<span class="fc" id="L183">            BigDecimal value = new BigDecimal(literal.value()).stripTrailingZeros();</span>
-<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            return value.scale() &lt;= 0</span>
-<span class="pc bpc" id="L185" title="1 of 2 branches missed.">                &amp;&amp; value.signum() &gt;= 0</span>
-<span class="pc bpc" id="L186" title="1 of 2 branches missed.">                &amp;&amp; value.compareTo(BigDecimal.valueOf(20)) &lt;= 0;</span>
-<span class="nc" id="L187">        } catch (NumberFormatException exception) {</span>
-<span class="nc" id="L188">            return false;</span>
+<span class="fc" id="L189">            BigDecimal value = new BigDecimal(literal.value()).stripTrailingZeros();</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">            return value.scale() &lt;= 0</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                &amp;&amp; value.signum() &gt;= 0</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                &amp;&amp; value.compareTo(BigDecimal.valueOf(20)) &lt;= 0;</span>
+<span class="nc" id="L193">        } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L194">            return false;</span>
         }
     }
 }

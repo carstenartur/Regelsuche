@@ -1,0 +1,1346 @@
+{
+  "classification": "RETROSPECTIVE_FIXED_PANEL",
+  "rowsJsonlSha256": "3a6772245ea28187c639b352f2210217c23e69bb908ef48cbcc4c0067ec1c8fa",
+  "freezeHash": "sha256:0c7296ad0464030e227d7e3535d7ea3449a04b412407ef3a2396a4f212d21c06",
+  "sourceManifest": {
+    "modules": [
+      "core",
+      "egraph",
+      "learning",
+      "math-algorithms",
+      "search",
+      "solver-ir",
+      "validation"
+    ],
+    "files": 1134,
+    "sha256": "cff763a1830b6f24d44c70256674b61b9c777d40fcb968423a2670cfd1361031"
+  },
+  "armOrder": [
+    "BASE",
+    "DROP",
+    "LOCAL",
+    "INDEXED",
+    "SELECTED",
+    "ROUTED",
+    "SELECTED_DROP",
+    "ROUTED_DROP"
+  ],
+  "totals": {
+    "BASE": {
+      "acquisition": 0,
+      "loadAndPrepare": 0,
+      "query": 4540,
+      "lifecycle": 4540,
+      "separateCoefficientAudit": 1512,
+      "solved": 16,
+      "casesWithLearnedStep": 0,
+      "learnedSteps": 0,
+      "rowsSha256": "b81ec9e87827abbd7befc2dfd58c03cb49bd1b9aa046363fea7ed4538739288d"
+    },
+    "DROP": {
+      "acquisition": 13543,
+      "loadAndPrepare": 1398,
+      "query": 5724,
+      "lifecycle": 20665,
+      "separateCoefficientAudit": 1512,
+      "solved": 16,
+      "casesWithLearnedStep": 0,
+      "learnedSteps": 0,
+      "rowsSha256": "0ddf73ce56d7bd4b131754bf99a06cfe8c3ce3939f0e6f4da76e32faeb150f71"
+    },
+    "LOCAL": {
+      "acquisition": 13543,
+      "loadAndPrepare": 1398,
+      "query": 6656,
+      "lifecycle": 21597,
+      "separateCoefficientAudit": 1512,
+      "solved": 16,
+      "casesWithLearnedStep": 12,
+      "learnedSteps": 16,
+      "rowsSha256": "df01dacb9db70eee251c4fd73eb22fe2555c0b9da37086ee7429a9b4572491cb"
+    },
+    "INDEXED": {
+      "acquisition": 13543,
+      "loadAndPrepare": 1678,
+      "query": 7572,
+      "lifecycle": 22793,
+      "separateCoefficientAudit": 1512,
+      "solved": 16,
+      "casesWithLearnedStep": 12,
+      "learnedSteps": 16,
+      "rowsSha256": "29393d710a2ede171a22a86865969d6983f23a278035f73518b6ee1c2dcd9bb3"
+    },
+    "SELECTED": {
+      "acquisition": 13543,
+      "loadAndPrepare": 1751,
+      "query": 5952,
+      "lifecycle": 21246,
+      "separateCoefficientAudit": 1512,
+      "solved": 16,
+      "casesWithLearnedStep": 12,
+      "learnedSteps": 16,
+      "rowsSha256": "6301691b09dbea346a6f07b7f67caa6a036233ee908afb2e7d13b1b5b772353f"
+    },
+    "ROUTED": {
+      "acquisition": 13543,
+      "loadAndPrepare": 2092,
+      "query": 5668,
+      "lifecycle": 21303,
+      "separateCoefficientAudit": 1512,
+      "solved": 16,
+      "casesWithLearnedStep": 12,
+      "learnedSteps": 16,
+      "rowsSha256": "3f3b26616e38f7bfad8950b7d669aab26733e83be2c76569ddb85d82dbfb3e10"
+    },
+    "SELECTED_DROP": {
+      "acquisition": 13543,
+      "loadAndPrepare": 1751,
+      "query": 6340,
+      "lifecycle": 21634,
+      "separateCoefficientAudit": 1512,
+      "solved": 16,
+      "casesWithLearnedStep": 0,
+      "learnedSteps": 0,
+      "rowsSha256": "fd93c339279f9ca0f88c76f29602c7a23434f0b403a0e919e5d08596a8188312"
+    },
+    "ROUTED_DROP": {
+      "acquisition": 13543,
+      "loadAndPrepare": 2092,
+      "query": 6164,
+      "lifecycle": 21799,
+      "separateCoefficientAudit": 1512,
+      "solved": 16,
+      "casesWithLearnedStep": 0,
+      "learnedSteps": 0,
+      "rowsSha256": "8ff800f53702bdcafa0b344bdc36505f6552c7d593a5e6351d741c774336194d"
+    }
+  },
+  "cases": [
+    {
+      "family": "two-site-energy",
+      "n": 2,
+      "queryInArmOrder": [
+        514,
+        582,
+        574,
+        645,
+        527,
+        536,
+        615,
+        624
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ],
+        "ROUTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ]
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "squared-compensated-product",
+      "n": 2,
+      "queryInArmOrder": [
+        213,
+        247,
+        235,
+        263,
+        241,
+        247,
+        274,
+        280
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ],
+        "ROUTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ]
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "rational-quotient",
+      "n": 2,
+      "queryInArmOrder": [
+        197,
+        231,
+        202,
+        227,
+        213,
+        221,
+        258,
+        266
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ],
+        "ROUTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ]
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "common-factor",
+      "n": 2,
+      "queryInArmOrder": [
+        67,
+        107,
+        187,
+        223,
+        150,
+        100,
+        130,
+        100
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [],
+        "ROUTED": []
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "residual-near-miss",
+      "n": 2,
+      "queryInArmOrder": [
+        112,
+        192,
+        370,
+        425,
+        257,
+        264,
+        215,
+        222
+      ],
+      "solvedInArmOrder": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "schemaIds": {
+        "SELECTED": [],
+        "ROUTED": []
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "irreducible",
+      "n": 2,
+      "queryInArmOrder": [
+        32,
+        72,
+        96,
+        110,
+        100,
+        49,
+        93,
+        49
+      ],
+      "solvedInArmOrder": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "schemaIds": {
+        "SELECTED": [],
+        "ROUTED": []
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "two-site-energy",
+      "n": 3,
+      "queryInArmOrder": [
+        514,
+        582,
+        574,
+        645,
+        527,
+        536,
+        615,
+        624
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ],
+        "ROUTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ]
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "squared-compensated-product",
+      "n": 3,
+      "queryInArmOrder": [
+        213,
+        247,
+        235,
+        263,
+        241,
+        247,
+        274,
+        280
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ],
+        "ROUTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ]
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "rational-quotient",
+      "n": 3,
+      "queryInArmOrder": [
+        197,
+        231,
+        202,
+        227,
+        213,
+        221,
+        258,
+        266
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ],
+        "ROUTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ]
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "common-factor",
+      "n": 3,
+      "queryInArmOrder": [
+        67,
+        107,
+        187,
+        223,
+        150,
+        100,
+        130,
+        100
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [],
+        "ROUTED": []
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "residual-near-miss",
+      "n": 3,
+      "queryInArmOrder": [
+        112,
+        192,
+        370,
+        425,
+        257,
+        264,
+        215,
+        222
+      ],
+      "solvedInArmOrder": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "schemaIds": {
+        "SELECTED": [],
+        "ROUTED": []
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "irreducible",
+      "n": 3,
+      "queryInArmOrder": [
+        32,
+        72,
+        96,
+        110,
+        100,
+        49,
+        93,
+        49
+      ],
+      "solvedInArmOrder": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "schemaIds": {
+        "SELECTED": [],
+        "ROUTED": []
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "two-site-energy",
+      "n": 5,
+      "queryInArmOrder": [
+        514,
+        582,
+        574,
+        645,
+        527,
+        536,
+        615,
+        624
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ],
+        "ROUTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ]
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "squared-compensated-product",
+      "n": 5,
+      "queryInArmOrder": [
+        213,
+        247,
+        235,
+        263,
+        241,
+        247,
+        274,
+        280
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ],
+        "ROUTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ]
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "rational-quotient",
+      "n": 5,
+      "queryInArmOrder": [
+        197,
+        231,
+        202,
+        227,
+        213,
+        221,
+        258,
+        266
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ],
+        "ROUTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ]
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "common-factor",
+      "n": 5,
+      "queryInArmOrder": [
+        67,
+        107,
+        187,
+        223,
+        150,
+        100,
+        130,
+        100
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [],
+        "ROUTED": []
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "residual-near-miss",
+      "n": 5,
+      "queryInArmOrder": [
+        112,
+        192,
+        370,
+        425,
+        257,
+        264,
+        215,
+        222
+      ],
+      "solvedInArmOrder": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "schemaIds": {
+        "SELECTED": [],
+        "ROUTED": []
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "irreducible",
+      "n": 5,
+      "queryInArmOrder": [
+        32,
+        72,
+        96,
+        110,
+        100,
+        49,
+        93,
+        49
+      ],
+      "solvedInArmOrder": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "schemaIds": {
+        "SELECTED": [],
+        "ROUTED": []
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "two-site-energy",
+      "n": 7,
+      "queryInArmOrder": [
+        514,
+        582,
+        574,
+        645,
+        527,
+        536,
+        615,
+        624
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ],
+        "ROUTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d",
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ]
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "squared-compensated-product",
+      "n": 7,
+      "queryInArmOrder": [
+        213,
+        247,
+        235,
+        263,
+        241,
+        247,
+        274,
+        280
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ],
+        "ROUTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ]
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "rational-quotient",
+      "n": 7,
+      "queryInArmOrder": [
+        197,
+        231,
+        202,
+        227,
+        213,
+        221,
+        258,
+        266
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ],
+        "ROUTED": [
+          "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+        ]
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "common-factor",
+      "n": 7,
+      "queryInArmOrder": [
+        67,
+        107,
+        187,
+        223,
+        150,
+        100,
+        130,
+        100
+      ],
+      "solvedInArmOrder": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "schemaIds": {
+        "SELECTED": [],
+        "ROUTED": []
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "residual-near-miss",
+      "n": 7,
+      "queryInArmOrder": [
+        112,
+        192,
+        370,
+        425,
+        257,
+        264,
+        215,
+        222
+      ],
+      "solvedInArmOrder": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "schemaIds": {
+        "SELECTED": [],
+        "ROUTED": []
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    },
+    {
+      "family": "irreducible",
+      "n": 7,
+      "queryInArmOrder": [
+        32,
+        72,
+        96,
+        110,
+        100,
+        49,
+        93,
+        49
+      ],
+      "solvedInArmOrder": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "schemaIds": {
+        "SELECTED": [],
+        "ROUTED": []
+      },
+      "samePathAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      },
+      "sameOutcomeAsLocal": {
+        "SELECTED": true,
+        "ROUTED": true
+      }
+    }
+  ],
+  "runs": [
+    {
+      "rotation": 0,
+      "rawSha256": "f0c64c4cb4745d91771a340ddc5e3ea48462ef3f3288f5bedcebb4bfaaa201fb",
+      "elapsedAndCpuNanos": {
+        "BASE": [
+          341347116,
+          318875432
+        ],
+        "DROP": [
+          182598576,
+          174901996
+        ],
+        "LOCAL": [
+          195405647,
+          189031162
+        ],
+        "INDEXED": [
+          127661935,
+          121477790
+        ],
+        "SELECTED": [
+          80908895,
+          80897657
+        ],
+        "ROUTED": [
+          70135905,
+          65544809
+        ],
+        "SELECTED_DROP": [
+          64487057,
+          64177729
+        ],
+        "ROUTED_DROP": [
+          93267402,
+          82775246
+        ]
+      }
+    },
+    {
+      "rotation": 1,
+      "rawSha256": "99920229c67633cbd433e7d4ebbdc7098e1b74cc146989d2029ed20a1402005f",
+      "elapsedAndCpuNanos": {
+        "DROP": [
+          447369426,
+          425252532
+        ],
+        "LOCAL": [
+          207752291,
+          196638513
+        ],
+        "INDEXED": [
+          104042551,
+          97105711
+        ],
+        "SELECTED": [
+          87384086,
+          86898741
+        ],
+        "ROUTED": [
+          88085848,
+          75403961
+        ],
+        "SELECTED_DROP": [
+          67639056,
+          65338486
+        ],
+        "ROUTED_DROP": [
+          83338175,
+          62911399
+        ],
+        "BASE": [
+          62660896,
+          51606727
+        ]
+      }
+    },
+    {
+      "rotation": 2,
+      "rawSha256": "591370f12f76d44a38bca4ac63e83b060dc15239162fd11bfea34866822d6e60",
+      "elapsedAndCpuNanos": {
+        "LOCAL": [
+          480393628,
+          433738217
+        ],
+        "INDEXED": [
+          185139613,
+          169709813
+        ],
+        "SELECTED": [
+          121187128,
+          97750559
+        ],
+        "ROUTED": [
+          97243382,
+          76992009
+        ],
+        "SELECTED_DROP": [
+          118201745,
+          117419757
+        ],
+        "ROUTED_DROP": [
+          67935922,
+          60573996
+        ],
+        "BASE": [
+          58991728,
+          52897148
+        ],
+        "DROP": [
+          49520760,
+          49165517
+        ]
+      }
+    },
+    {
+      "rotation": 3,
+      "rawSha256": "993da2e6a4106f97f2848355a1008c9f5e860cf622ae39962736d455c71e8d09",
+      "elapsedAndCpuNanos": {
+        "INDEXED": [
+          515575765,
+          498212384
+        ],
+        "SELECTED": [
+          184393197,
+          174396701
+        ],
+        "ROUTED": [
+          142720933,
+          118489567
+        ],
+        "SELECTED_DROP": [
+          161086919,
+          145368883
+        ],
+        "ROUTED_DROP": [
+          89501564,
+          83126154
+        ],
+        "BASE": [
+          65961063,
+          58209680
+        ],
+        "DROP": [
+          56494172,
+          56320412
+        ],
+        "LOCAL": [
+          68757756,
+          60598511
+        ]
+      }
+    },
+    {
+      "rotation": 4,
+      "rawSha256": "4411d8a0ab2c4c0bab91873dea78e10d185bdd4406949b57604385cf90fa7cde",
+      "elapsedAndCpuNanos": {
+        "SELECTED": [
+          524575310,
+          474368173
+        ],
+        "ROUTED": [
+          179162249,
+          165705759
+        ],
+        "SELECTED_DROP": [
+          112330668,
+          111252964
+        ],
+        "ROUTED_DROP": [
+          109517321,
+          94066345
+        ],
+        "BASE": [
+          100202318,
+          97609727
+        ],
+        "DROP": [
+          73703999,
+          68847836
+        ],
+        "LOCAL": [
+          64575248,
+          64220421
+        ],
+        "INDEXED": [
+          77839059,
+          71380797
+        ]
+      }
+    },
+    {
+      "rotation": 5,
+      "rawSha256": "ef3e82132533ad33ecc203dac5467f69e90d39e6c1bfba16329e603d127da41a",
+      "elapsedAndCpuNanos": {
+        "ROUTED": [
+          788743721,
+          763339589
+        ],
+        "SELECTED_DROP": [
+          138059606,
+          136119556
+        ],
+        "ROUTED_DROP": [
+          114045123,
+          108527412
+        ],
+        "BASE": [
+          76307417,
+          69695483
+        ],
+        "DROP": [
+          62613795,
+          61929894
+        ],
+        "LOCAL": [
+          78156523,
+          69421631
+        ],
+        "INDEXED": [
+          71037276,
+          65330273
+        ],
+        "SELECTED": [
+          97342103,
+          71322028
+        ]
+      }
+    },
+    {
+      "rotation": 6,
+      "rawSha256": "57b60297b3dfe2b62a676bad77688bc6f4ef736297bf0d60e59d181527580341",
+      "elapsedAndCpuNanos": {
+        "SELECTED_DROP": [
+          392506872,
+          373217688
+        ],
+        "ROUTED_DROP": [
+          118047706,
+          113403679
+        ],
+        "BASE": [
+          83089530,
+          82533339
+        ],
+        "DROP": [
+          80034537,
+          72944832
+        ],
+        "LOCAL": [
+          155102862,
+          149688782
+        ],
+        "INDEXED": [
+          81638213,
+          81298351
+        ],
+        "SELECTED": [
+          68900773,
+          63893968
+        ],
+        "ROUTED": [
+          86969826,
+          73806795
+        ]
+      }
+    },
+    {
+      "rotation": 7,
+      "rawSha256": "3d30344496dd6200e29184cb6481688d475d68d89e1f5351cc0c1fdfa32d8f06",
+      "elapsedAndCpuNanos": {
+        "ROUTED_DROP": [
+          668479502,
+          646497679
+        ],
+        "BASE": [
+          218096660,
+          208424529
+        ],
+        "DROP": [
+          98502976,
+          90444416
+        ],
+        "LOCAL": [
+          191752927,
+          185366387
+        ],
+        "INDEXED": [
+          142064849,
+          136826112
+        ],
+        "SELECTED": [
+          113554355,
+          113188765
+        ],
+        "ROUTED": [
+          67074047,
+          55774234
+        ],
+        "SELECTED_DROP": [
+          56897904,
+          56898268
+        ]
+      }
+    }
+  ]
+}

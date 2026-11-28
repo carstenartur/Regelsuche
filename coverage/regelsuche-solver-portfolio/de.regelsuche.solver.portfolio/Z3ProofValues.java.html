@@ -82,209 +82,212 @@ final class Z3ProofValues {
             case &quot;&lt;=&quot;, &quot;&gt;=&quot; -&gt; {
 <span class="fc" id="L83">                var args = node.items(3);</span>
 <span class="fc" id="L84">                Real a = asReal(value(args.get(1))), b = asReal(value(args.get(2)));</span>
-<span class="fc bfc" id="L85" title="All 4 branches covered.">                yield new Order(node.head(&quot;&lt;=&quot;) ? a : b, node.head(&quot;&lt;=&quot;) ? b : a,</span>
-<span class="fc" id="L86">                    admit(1L + a.size() + b.size()));</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                yield node.head(&quot;&lt;=&quot;) ? order(a, b) : order(b, a);</span>
             }
-<span class="fc" id="L88">            case &quot;to_real&quot; -&gt; integerCoercion(node);</span>
+<span class="fc" id="L87">            case &quot;to_real&quot; -&gt; integerCoercion(node);</span>
             case &quot;/&quot; -&gt; {
-<span class="fc" id="L90">                var args = node.items(3);</span>
-<span class="fc" id="L91">                yield quotient(asReal(value(args.get(1))), asReal(value(args.get(2))));</span>
+<span class="fc" id="L89">                var args = node.items(3);</span>
+<span class="fc" id="L90">                yield quotient(asReal(value(args.get(1))), asReal(value(args.get(2))));</span>
             }
-<span class="fc" id="L93">            case &quot;+&quot;, &quot;-&quot;, &quot;*&quot;, &quot;^&quot; -&gt; operation(node);</span>
-<span class="nc" id="L94">            default -&gt; throw new Invalid();</span>
+<span class="fc" id="L92">            case &quot;+&quot;, &quot;-&quot;, &quot;*&quot;, &quot;^&quot; -&gt; operation(node);</span>
+<span class="nc" id="L93">            default -&gt; throw new Invalid();</span>
         };
     }
 
-<span class="fc" id="L98">    Real expression(Expression expression) { return expression(expression, 0); }</span>
+<span class="fc" id="L97">    Real expression(Expression expression) { return expression(expression, 0); }</span>
     private Real expression(Expression expression, int depth) {
-<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new Invalid();</span>
-<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (expression instanceof Symbol symbol) {</span>
-<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (!symbols.contains(symbol.name())) throw new Invalid();</span>
-<span class="fc" id="L103">            return scalar(symbol);</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (depth &gt; 128) throw new Invalid();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (expression instanceof Symbol symbol) {</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (!symbols.contains(symbol.name())) throw new Invalid();</span>
+<span class="fc" id="L102">            return scalar(symbol);</span>
         }
-<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (expression instanceof Literal literal) return literal(literal.value());</span>
-<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (!(expression instanceof Binary binary)) throw new Invalid();</span>
-<span class="fc" id="L107">        Real left = expression(binary.left(), depth + 1), right = expression(binary.right(), depth + 1);</span>
-<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (binary.operator() == BinaryOperator.DIVIDE) return quotient(left, right);</span>
-<span class="fc" id="L109">        return binary(binary.operator(), left, right);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (expression instanceof Literal literal) return literal(literal.value());</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (!(expression instanceof Binary binary)) throw new Invalid();</span>
+<span class="fc" id="L106">        Real left = expression(binary.left(), depth + 1), right = expression(binary.right(), depth + 1);</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (binary.operator() == BinaryOperator.DIVIDE) return quotient(left, right);</span>
+<span class="fc" id="L108">        return binary(binary.operator(), left, right);</span>
     }
 
     Equality equality(Value left, Value right) {
-<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if ((left instanceof Real) != (right instanceof Real)) throw new Invalid();</span>
-<span class="fc" id="L114">        int size = admit(1L + left.size() + right.size());</span>
-<span class="fc" id="L115">        return new Equality(left, right, size);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if ((left instanceof Real) != (right instanceof Real)) throw new Invalid();</span>
+<span class="fc" id="L113">        int size = admit(1L + left.size() + right.size());</span>
+<span class="fc" id="L114">        return new Equality(left, right, size);</span>
     }
-<span class="fc" id="L117">    Negation negate(Formula value) { return new Negation(value, admit(1L + value.size())); }</span>
+    Order order(Real lower, Real upper) {
+<span class="fc" id="L117">        return new Order(lower, upper, admit(1L + lower.size() + upper.size()));</span>
+    }
+
+<span class="fc" id="L120">    Negation negate(Formula value) { return new Negation(value, admit(1L + value.size())); }</span>
 
     private Formula connective(Node node) {
-<span class="fc" id="L120">        var children = node.children();</span>
-<span class="pc bpc" id="L121" title="2 of 4 branches missed.">        if (children.size() &lt; 3 || children.size() &gt; 129) throw new Invalid();</span>
-<span class="fc" id="L122">        var operands = new ArrayList&lt;Formula&gt;();</span>
-<span class="fc" id="L123">        long size = 1;</span>
-<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (int i = 1; i &lt; children.size(); i++) {</span>
-<span class="fc" id="L125">            Formula operand = formula(children.get(i));</span>
-<span class="fc" id="L126">            size += operand.size();</span>
-<span class="fc" id="L127">            operands.add(operand);</span>
+<span class="fc" id="L123">        var children = node.children();</span>
+<span class="pc bpc" id="L124" title="2 of 4 branches missed.">        if (children.size() &lt; 3 || children.size() &gt; 129) throw new Invalid();</span>
+<span class="fc" id="L125">        var operands = new ArrayList&lt;Formula&gt;();</span>
+<span class="fc" id="L126">        long size = 1;</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (int i = 1; i &lt; children.size(); i++) {</span>
+<span class="fc" id="L128">            Formula operand = formula(children.get(i));</span>
+<span class="fc" id="L129">            size += operand.size();</span>
+<span class="fc" id="L130">            operands.add(operand);</span>
         }
-<span class="fc" id="L129">        int admitted = admit(size);</span>
-<span class="fc bfc" id="L130" title="All 2 branches covered.">        return node.head(&quot;or&quot;) ? new Disjunction(List.copyOf(operands), admitted)</span>
-<span class="fc" id="L131">            : new Conjunction(List.copyOf(operands), admitted);</span>
+<span class="fc" id="L132">        int admitted = admit(size);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        return node.head(&quot;or&quot;) ? new Disjunction(List.copyOf(operands), admitted)</span>
+<span class="fc" id="L134">            : new Conjunction(List.copyOf(operands), admitted);</span>
     }
 
     private Real integerCoercion(Node node) {
-<span class="fc" id="L135">        Real value = asReal(value(node.items(2).get(1)));</span>
-<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (!(value.expression() instanceof Literal literal)</span>
-<span class="fc bfc" id="L137" title="All 2 branches covered.">                || new BigDecimal(literal.value()).scale() &gt; 0) throw new Invalid();</span>
-<span class="fc" id="L138">        return value;</span>
+<span class="fc" id="L138">        Real value = asReal(value(node.items(2).get(1)));</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (!(value.expression() instanceof Literal literal)</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                || new BigDecimal(literal.value()).scale() &gt; 0) throw new Invalid();</span>
+<span class="fc" id="L141">        return value;</span>
     }
 
     private Real operation(Node node) {
-<span class="fc" id="L142">        var nodes = node.children();</span>
-<span class="pc bpc" id="L143" title="2 of 4 branches missed.">        if (nodes.size() &lt; 2 || nodes.size() &gt; 129) throw new Invalid();</span>
-<span class="fc" id="L144">        var arguments = new ArrayList&lt;Real&gt;();</span>
-<span class="fc bfc" id="L145" title="All 2 branches covered.">        for (int i = 1; i &lt; nodes.size(); i++) arguments.add(asReal(value(nodes.get(i))));</span>
-<span class="pc bpc" id="L146" title="1 of 5 branches missed.">        BinaryOperator operator = switch (node.first()) {</span>
-<span class="fc" id="L147">            case &quot;+&quot; -&gt; BinaryOperator.ADD;</span>
-<span class="fc" id="L148">            case &quot;-&quot; -&gt; BinaryOperator.SUBTRACT;</span>
-<span class="fc" id="L149">            case &quot;*&quot; -&gt; BinaryOperator.MULTIPLY;</span>
-<span class="fc" id="L150">            case &quot;^&quot; -&gt; BinaryOperator.POWER;</span>
-<span class="nc" id="L151">            default -&gt; throw new Invalid();</span>
+<span class="fc" id="L145">        var nodes = node.children();</span>
+<span class="pc bpc" id="L146" title="2 of 4 branches missed.">        if (nodes.size() &lt; 2 || nodes.size() &gt; 129) throw new Invalid();</span>
+<span class="fc" id="L147">        var arguments = new ArrayList&lt;Real&gt;();</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        for (int i = 1; i &lt; nodes.size(); i++) arguments.add(asReal(value(nodes.get(i))));</span>
+<span class="pc bpc" id="L149" title="1 of 5 branches missed.">        BinaryOperator operator = switch (node.first()) {</span>
+<span class="fc" id="L150">            case &quot;+&quot; -&gt; BinaryOperator.ADD;</span>
+<span class="fc" id="L151">            case &quot;-&quot; -&gt; BinaryOperator.SUBTRACT;</span>
+<span class="fc" id="L152">            case &quot;*&quot; -&gt; BinaryOperator.MULTIPLY;</span>
+<span class="fc" id="L153">            case &quot;^&quot; -&gt; BinaryOperator.POWER;</span>
+<span class="nc" id="L154">            default -&gt; throw new Invalid();</span>
         };
-<span class="fc bfc" id="L153" title="All 4 branches covered.">        if (arguments.size() == 1 &amp;&amp; operator == BinaryOperator.SUBTRACT) {</span>
-<span class="fc" id="L154">            Real argument = arguments.getFirst();</span>
-<span class="pc bpc" id="L155" title="1 of 2 branches missed.">            if (argument.expression() instanceof Literal literal) {</span>
-<span class="fc" id="L156">                return literal(new BigDecimal(literal.value()).negate().toPlainString());</span>
+<span class="fc bfc" id="L156" title="All 4 branches covered.">        if (arguments.size() == 1 &amp;&amp; operator == BinaryOperator.SUBTRACT) {</span>
+<span class="fc" id="L157">            Real argument = arguments.getFirst();</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            if (argument.expression() instanceof Literal literal) {</span>
+<span class="fc" id="L159">                return literal(new BigDecimal(literal.value()).negate().toPlainString());</span>
             }
-<span class="nc" id="L158">            Real result = binary(operator, literal(&quot;0&quot;), argument);</span>
-<span class="nc" id="L159">            return new Real(result.expression(), operator, List.copyOf(arguments),</span>
-<span class="nc" id="L160">                result.size(), result.monomials(), result.degree(), result.coefficients());</span>
+<span class="nc" id="L161">            Real result = binary(operator, literal(&quot;0&quot;), argument);</span>
+<span class="nc" id="L162">            return new Real(result.expression(), operator, List.copyOf(arguments),</span>
+<span class="nc" id="L163">                result.size(), result.monomials(), result.degree(), result.coefficients());</span>
         }
-<span class="pc bpc" id="L162" title="1 of 6 branches missed.">        if (arguments.size() &lt; 2 || operator == BinaryOperator.POWER &amp;&amp; arguments.size() != 2) throw new Invalid();</span>
-<span class="fc" id="L163">        Real result = arguments.getFirst();</span>
-<span class="fc bfc" id="L164" title="All 2 branches covered.">        for (int i = 1; i &lt; arguments.size(); i++) result = binary(operator, result, arguments.get(i));</span>
-<span class="fc" id="L165">        return new Real(result.expression(), operator, List.copyOf(arguments),</span>
-<span class="fc" id="L166">            result.size(), result.monomials(), result.degree(), result.coefficients());</span>
+<span class="pc bpc" id="L165" title="1 of 6 branches missed.">        if (arguments.size() &lt; 2 || operator == BinaryOperator.POWER &amp;&amp; arguments.size() != 2) throw new Invalid();</span>
+<span class="fc" id="L166">        Real result = arguments.getFirst();</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (int i = 1; i &lt; arguments.size(); i++) result = binary(operator, result, arguments.get(i));</span>
+<span class="fc" id="L168">        return new Real(result.expression(), operator, List.copyOf(arguments),</span>
+<span class="fc" id="L169">            result.size(), result.monomials(), result.degree(), result.coefficients());</span>
     }
 
     Real difference(Real left, Real right) {
-<span class="fc" id="L170">        return binary(BinaryOperator.SUBTRACT, left, right);</span>
+<span class="fc" id="L173">        return binary(BinaryOperator.SUBTRACT, left, right);</span>
     }
 
     Real product(Real left, Real right) {
-<span class="fc" id="L174">        return binary(BinaryOperator.MULTIPLY, left, right);</span>
+<span class="fc" id="L177">        return binary(BinaryOperator.MULTIPLY, left, right);</span>
     }
 
     private Real binary(BinaryOperator operator, Real left, Real right) {
-<span class="fc" id="L178">        int size = admit(1L + left.size() + right.size());</span>
-<span class="fc" id="L179">        int degree = Math.max(left.degree(), right.degree());</span>
+<span class="fc" id="L181">        int size = admit(1L + left.size() + right.size());</span>
+<span class="fc" id="L182">        int degree = Math.max(left.degree(), right.degree());</span>
         long monomials;
         CoefficientBits coefficients;
-<span class="pc bpc" id="L182" title="1 of 4 branches missed.">        switch (operator) {</span>
+<span class="pc bpc" id="L185" title="1 of 4 branches missed.">        switch (operator) {</span>
             case ADD, SUBTRACT -&gt; {
-<span class="fc" id="L184">                monomials = (long) left.monomials() + right.monomials();</span>
-<span class="fc" id="L185">                coefficients = left.coefficients().add(right.coefficients());</span>
-<span class="fc" id="L186">            }</span>
+<span class="fc" id="L187">                monomials = (long) left.monomials() + right.monomials();</span>
+<span class="fc" id="L188">                coefficients = left.coefficients().add(right.coefficients());</span>
+<span class="fc" id="L189">            }</span>
             case MULTIPLY -&gt; {
-<span class="fc" id="L188">                monomials = (long) left.monomials() * right.monomials();</span>
-<span class="fc" id="L189">                degree = left.degree() + right.degree();</span>
-<span class="fc" id="L190">                coefficients = left.coefficients().multiply(right.coefficients(), (int) monomials);</span>
-<span class="fc" id="L191">            }</span>
+<span class="fc" id="L191">                monomials = (long) left.monomials() * right.monomials();</span>
+<span class="fc" id="L192">                degree = left.degree() + right.degree();</span>
+<span class="fc" id="L193">                coefficients = left.coefficients().multiply(right.coefficients(), (int) monomials);</span>
+<span class="fc" id="L194">            }</span>
             case POWER -&gt; {
-<span class="fc bfc" id="L193" title="All 2 branches covered.">                if (!(right.expression() instanceof Literal literal)) throw new Invalid();</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">                if (!(right.expression() instanceof Literal literal)) throw new Invalid();</span>
                 int exponent;
-<span class="fc" id="L195">                try { exponent = new BigDecimal(literal.value()).intValueExact(); }</span>
-<span class="pc" id="L196">                catch (ArithmeticException invalid) { throw new Invalid(); }</span>
+<span class="fc" id="L198">                try { exponent = new BigDecimal(literal.value()).intValueExact(); }</span>
+<span class="pc" id="L199">                catch (ArithmeticException invalid) { throw new Invalid(); }</span>
                 // Native Z3 power does not justify x^0 = 1 when x may be zero.
-<span class="fc bfc" id="L198" title="All 4 branches covered.">                if (exponent &lt; 1 || exponent &gt; 20) throw new Invalid();</span>
-<span class="fc" id="L199">                degree = left.degree() * exponent;</span>
-<span class="fc" id="L200">                monomials = 1;</span>
-<span class="fc bfc" id="L201" title="All 2 branches covered.">                for (int i = 0; i &lt; exponent; i++) {</span>
-<span class="fc" id="L202">                    monomials *= left.monomials();</span>
-<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                    if (monomials &gt; 256) throw new Invalid();</span>
+<span class="fc bfc" id="L201" title="All 4 branches covered.">                if (exponent &lt; 1 || exponent &gt; 20) throw new Invalid();</span>
+<span class="fc" id="L202">                degree = left.degree() * exponent;</span>
+<span class="fc" id="L203">                monomials = 1;</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                for (int i = 0; i &lt; exponent; i++) {</span>
+<span class="fc" id="L205">                    monomials *= left.monomials();</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                    if (monomials &gt; 256) throw new Invalid();</span>
                 }
-<span class="fc" id="L205">                coefficients = left.coefficients().power(exponent, (int) monomials);</span>
-<span class="fc" id="L206">            }</span>
-<span class="nc" id="L207">            default -&gt; throw new Invalid();</span>
+<span class="fc" id="L208">                coefficients = left.coefficients().power(exponent, (int) monomials);</span>
+<span class="fc" id="L209">            }</span>
+<span class="nc" id="L210">            default -&gt; throw new Invalid();</span>
         }
-<span class="pc bpc" id="L209" title="2 of 4 branches missed.">        if (monomials &gt; 256 || degree &gt; 32) throw new Invalid();</span>
-<span class="fc" id="L210">        return new Real(new Binary(operator, left.expression(), right.expression()), operator,</span>
-<span class="fc" id="L211">            List.of(left, right), size, (int) monomials, degree, coefficients);</span>
+<span class="pc bpc" id="L212" title="2 of 4 branches missed.">        if (monomials &gt; 256 || degree &gt; 32) throw new Invalid();</span>
+<span class="fc" id="L213">        return new Real(new Binary(operator, left.expression(), right.expression()), operator,</span>
+<span class="fc" id="L214">            List.of(left, right), size, (int) monomials, degree, coefficients);</span>
     }
 
     private Real quotient(Real numerator, Real denominator) {
-<span class="pc bpc" id="L215" title="1 of 4 branches missed.">        if (!(numerator.expression() instanceof Literal a) || !(denominator.expression() instanceof Literal b)) throw new Invalid();</span>
-<span class="fc" id="L216">        try { return literal(new BigDecimal(a.value()).divide(new BigDecimal(b.value())).toPlainString()); }</span>
-<span class="fc" id="L217">        catch (ArithmeticException invalid) { throw new Invalid(); }</span>
+<span class="pc bpc" id="L218" title="1 of 4 branches missed.">        if (!(numerator.expression() instanceof Literal a) || !(denominator.expression() instanceof Literal b)) throw new Invalid();</span>
+<span class="fc" id="L219">        try { return literal(new BigDecimal(a.value()).divide(new BigDecimal(b.value())).toPlainString()); }</span>
+<span class="fc" id="L220">        catch (ArithmeticException invalid) { throw new Invalid(); }</span>
     }
 
     private Real literal(String value) {
-<span class="pc bpc" id="L221" title="2 of 4 branches missed.">        if (value.length() &gt; 256 || !value.matches(&quot;-?[0-9]+(?:\\.[0-9]+)?&quot;)) throw new Invalid();</span>
-<span class="fc" id="L222">        return scalar(new Literal(value));</span>
+<span class="pc bpc" id="L224" title="2 of 4 branches missed.">        if (value.length() &gt; 256 || !value.matches(&quot;-?[0-9]+(?:\\.[0-9]+)?&quot;)) throw new Invalid();</span>
+<span class="fc" id="L225">        return scalar(new Literal(value));</span>
     }
 
     private Real scalar(Expression expression) {
-<span class="fc bfc" id="L226" title="All 2 branches covered.">        CoefficientBits coefficients = expression instanceof Literal literal</span>
-<span class="fc" id="L227">            ? CoefficientBits.literal(literal) : new CoefficientBits(1, 1);</span>
-<span class="fc bfc" id="L228" title="All 2 branches covered.">        return new Real(expression, null, List.of(), admit(1), 1, expression instanceof Symbol ? 1 : 0, coefficients);</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        CoefficientBits coefficients = expression instanceof Literal literal</span>
+<span class="fc" id="L230">            ? CoefficientBits.literal(literal) : new CoefficientBits(1, 1);</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        return new Real(expression, null, List.of(), admit(1), 1, expression instanceof Symbol ? 1 : 0, coefficients);</span>
     }
 
     /** Conservative bounds for all coefficient numerators over one common denominator. */
     private record CoefficientBits(int numerator, int denominator) {
-<span class="fc" id="L233">        CoefficientBits {</span>
-<span class="pc bpc" id="L234" title="2 of 8 branches missed.">            if (numerator &lt; 1 || denominator &lt; 1 || numerator &gt; 4096 || denominator &gt; 4096) throw new Invalid();</span>
-<span class="fc" id="L235">        }</span>
+<span class="fc" id="L236">        CoefficientBits {</span>
+<span class="pc bpc" id="L237" title="2 of 8 branches missed.">            if (numerator &lt; 1 || denominator &lt; 1 || numerator &gt; 4096 || denominator &gt; 4096) throw new Invalid();</span>
+<span class="fc" id="L238">        }</span>
 
         static CoefficientBits literal(Literal literal) {
             // Literal admission already limits the decimal to 256 characters.
-<span class="fc" id="L239">            var decimal = new BigDecimal(literal.value());</span>
-<span class="fc" id="L240">            return new CoefficientBits(Math.max(1, decimal.unscaledValue().abs().bitLength()),</span>
-<span class="fc" id="L241">                BigInteger.TEN.pow(decimal.scale()).bitLength());</span>
+<span class="fc" id="L242">            var decimal = new BigDecimal(literal.value());</span>
+<span class="fc" id="L243">            return new CoefficientBits(Math.max(1, decimal.unscaledValue().abs().bitLength()),</span>
+<span class="fc" id="L244">                BigInteger.TEN.pow(decimal.scale()).bitLength());</span>
         }
 
         CoefficientBits add(CoefficientBits other) {
-<span class="fc" id="L245">            return new CoefficientBits(Math.max(numerator + other.denominator, other.numerator + denominator) + 1,</span>
+<span class="fc" id="L248">            return new CoefficientBits(Math.max(numerator + other.denominator, other.numerator + denominator) + 1,</span>
                 denominator + other.denominator);
         }
 
         CoefficientBits multiply(CoefficientBits other, int expandedTerms) {
-<span class="fc" id="L250">            return new CoefficientBits(numerator + other.numerator + ceilLog2(expandedTerms),</span>
+<span class="fc" id="L253">            return new CoefficientBits(numerator + other.numerator + ceilLog2(expandedTerms),</span>
                 denominator + other.denominator);
         }
 
         CoefficientBits power(int exponent, int expandedTerms) {
-<span class="fc" id="L255">            return new CoefficientBits(exponent * numerator + ceilLog2(expandedTerms), exponent * denominator);</span>
+<span class="fc" id="L258">            return new CoefficientBits(exponent * numerator + ceilLog2(expandedTerms), exponent * denominator);</span>
         }
 
-<span class="fc" id="L258">        private static int ceilLog2(int count) { return Integer.SIZE - Integer.numberOfLeadingZeros(count - 1); }</span>
+<span class="fc" id="L261">        private static int ceilLog2(int count) { return Integer.SIZE - Integer.numberOfLeadingZeros(count - 1); }</span>
     }
 
     private int admit(long size) {
-<span class="pc bpc" id="L262" title="1 of 4 branches missed.">        if (size &gt; MAX_EXPANDED_SIZE || (admittedSize += (int) size) &gt; 65_536) throw new Invalid();</span>
-<span class="fc" id="L263">        return (int) size;</span>
+<span class="pc bpc" id="L265" title="1 of 4 branches missed.">        if (size &gt; MAX_EXPANDED_SIZE || (admittedSize += (int) size) &gt; 65_536) throw new Invalid();</span>
+<span class="fc" id="L266">        return (int) size;</span>
     }
 
     static boolean complements(Formula a, Formula b) {
-<span class="fc bfc" id="L267" title="All 4 branches covered.">        return a instanceof Negation n &amp;&amp; n.operand().equals(b)</span>
-<span class="fc bfc" id="L268" title="All 4 branches covered.">            || b instanceof Negation m &amp;&amp; m.operand().equals(a);</span>
+<span class="fc bfc" id="L270" title="All 4 branches covered.">        return a instanceof Negation n &amp;&amp; n.operand().equals(b)</span>
+<span class="fc bfc" id="L271" title="All 4 branches covered.">            || b instanceof Negation m &amp;&amp; m.operand().equals(a);</span>
     }
 
     static List&lt;? extends Value&gt; arguments(Value value) {
-<span class="pc bpc" id="L272" title="3 of 7 branches missed.">        return switch (value) {</span>
-<span class="fc" id="L273">            case Real real -&gt; real.arguments();</span>
-<span class="fc" id="L274">            case Equality equality -&gt; List.of(equality.left(), equality.right());</span>
-<span class="fc" id="L275">            case Negation negation -&gt; List.of(negation.operand());</span>
-<span class="nc" id="L276">            case Disjunction disjunction -&gt; disjunction.operands();</span>
-<span class="fc" id="L277">            case Conjunction conjunction -&gt; conjunction.operands();</span>
-<span class="nc" id="L278">            case Order order -&gt; List.of(order.lower(), order.upper());</span>
-<span class="nc" id="L279">            case Truth ignored -&gt; List.of();</span>
+<span class="pc bpc" id="L275" title="2 of 7 branches missed.">        return switch (value) {</span>
+<span class="fc" id="L276">            case Real real -&gt; real.arguments();</span>
+<span class="fc" id="L277">            case Equality equality -&gt; List.of(equality.left(), equality.right());</span>
+<span class="fc" id="L278">            case Negation negation -&gt; List.of(negation.operand());</span>
+<span class="nc" id="L279">            case Disjunction disjunction -&gt; disjunction.operands();</span>
+<span class="fc" id="L280">            case Conjunction conjunction -&gt; conjunction.operands();</span>
+<span class="fc" id="L281">            case Order order -&gt; List.of(order.lower(), order.upper());</span>
+<span class="nc" id="L282">            case Truth ignored -&gt; List.of();</span>
         };
     }
 
     static boolean sameOperator(Value left, Value right) {
-<span class="pc bpc" id="L284" title="1 of 4 branches missed.">        if (left instanceof Real a &amp;&amp; right instanceof Real b) {</span>
-<span class="pc bpc" id="L285" title="2 of 4 branches missed.">            return a.operator() != null &amp;&amp; a.operator() == b.operator();</span>
+<span class="pc bpc" id="L287" title="1 of 4 branches missed.">        if (left instanceof Real a &amp;&amp; right instanceof Real b) {</span>
+<span class="pc bpc" id="L288" title="2 of 4 branches missed.">            return a.operator() != null &amp;&amp; a.operator() == b.operator();</span>
         }
-<span class="pc bpc" id="L287" title="11 of 20 branches missed.">        return left instanceof Equality &amp;&amp; right instanceof Equality</span>
+<span class="pc bpc" id="L290" title="8 of 20 branches missed.">        return left instanceof Equality &amp;&amp; right instanceof Equality</span>
             || left instanceof Negation &amp;&amp; right instanceof Negation
             || left instanceof Disjunction &amp;&amp; right instanceof Disjunction
             || left instanceof Conjunction &amp;&amp; right instanceof Conjunction

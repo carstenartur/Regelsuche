@@ -1,0 +1,167 @@
+{
+  "sourceCommit": "aa3a8e5d6b0ed73e569927f572b8e865f936a473",
+  "initialResultCommit": "0a9b5fc9e6ec23ab8eca4fd50488ee20a36f7a6c",
+  "class": "POST_HOC_DEVELOPMENT_REPLAY",
+  "freezeSha256": "0c7296ad0464030e227d7e3535d7ea3449a04b412407ef3a2396a4f212d21c06",
+  "files": {
+    "freeze.json": "0c7296ad0464030e227d7e3535d7ea3449a04b412407ef3a2396a4f212d21c06",
+    "local.json": "655138a363923cba0cbf6ba0e1aa40d17825ffe1338e0b690b9fd7522f41688a",
+    "whole.json": "f157eac555dec5af28e69ae4de6d72bd9e83d98c05269e2331502d393272184b"
+  },
+  "localFormationCosts": {
+    "lessons": 952,
+    "formation": 8781,
+    "preparation": 688,
+    "validation": 2436,
+    "selection": 40,
+    "restoration": 0,
+    "splitChecking": 630
+  },
+  "schemaCount": 3,
+  "decision": "PROMOTED",
+  "outcomes": {
+    "BASE": {
+      "solved": 16,
+      "query": 4540,
+      "acquisition": 0,
+      "restoration": 0
+    },
+    "ORDER": {
+      "solved": 16,
+      "query": 4844,
+      "acquisition": 968,
+      "restoration": 0
+    },
+    "LOCAL": {
+      "solved": 16,
+      "query": 6656,
+      "acquisition": 13543,
+      "restoration": 1398
+    },
+    "DROP": {
+      "solved": 16,
+      "query": 5724,
+      "acquisition": 13543,
+      "restoration": 1398
+    },
+    "WHOLE": {
+      "solved": 16,
+      "query": 4844,
+      "acquisition": 1713,
+      "restoration": 1
+    },
+    "HAND": {
+      "solved": 4,
+      "query": 234424,
+      "acquisition": 0,
+      "restoration": 0
+    }
+  },
+  "changedLearnedProvider": [
+    "checked-learned:sha256:4b8c890d4d3c462efaec198d2127981c493eda227a6a46643b0eee8fc286639f",
+    "checked-learned:sha256:1f98ff45e4ca2ce1e70f2a4943f103c710baba99beaebd1d502aeba0f688edaf",
+    "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+  ],
+  "timingOrder": [
+    "elapsedNanos",
+    "threadCpuNanos"
+  ],
+  "runs": [
+    {
+      "rotation": 0,
+      "rawSha256": "4ad7c828b8f4d41e74a49892074e6819614af84385c6ad55db3e54de4b6a1a54",
+      "comparedCases": 144,
+      "changedProviderIdentities": 16,
+      "times": {
+        "BASE": [
+          317604446,
+          294518299
+        ],
+        "ORDER": [
+          88241773,
+          86665361
+        ],
+        "LOCAL": [
+          298714000,
+          280408709
+        ],
+        "DROP": [
+          161519041,
+          160971736
+        ],
+        "WHOLE": [
+          59827895,
+          59535229
+        ],
+        "HAND": [
+          242084193,
+          203779709
+        ]
+      }
+    },
+    {
+      "rotation": 1,
+      "rawSha256": "23928012c549d9cc548e062d4f900989823745b8ca86fa3380c29074d824cd6b",
+      "comparedCases": 144,
+      "changedProviderIdentities": 16,
+      "times": {
+        "LOCAL": [
+          492598549,
+          472342703
+        ],
+        "DROP": [
+          138132438,
+          134364168
+        ],
+        "WHOLE": [
+          84901425,
+          73130751
+        ],
+        "HAND": [
+          211312174,
+          190723848
+        ],
+        "BASE": [
+          72891046,
+          65885975
+        ],
+        "ORDER": [
+          65388823,
+          52836319
+        ]
+      }
+    },
+    {
+      "rotation": 2,
+      "rawSha256": "b5f3d4914f217b706ebae6d902684659677c84a29cfbb23b8eb51836552337ab",
+      "comparedCases": 144,
+      "changedProviderIdentities": 16,
+      "times": {
+        "WHOLE": [
+          473602063,
+          389466791
+        ],
+        "HAND": [
+          268326330,
+          220386467
+        ],
+        "BASE": [
+          146874618,
+          81992368
+        ],
+        "ORDER": [
+          146324921,
+          61841078
+        ],
+        "LOCAL": [
+          347877234,
+          201721626
+        ],
+        "DROP": [
+          102445492,
+          82857406
+        ]
+      }
+    }
+  ]
+}

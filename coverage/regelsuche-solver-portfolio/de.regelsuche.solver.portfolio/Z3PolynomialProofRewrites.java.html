@@ -55,9 +55,9 @@ final class Z3PolynomialProofRewrites {
 
     private boolean equivalentRelations(Formula a, Formula b, int depth) {
 <span class="pc bpc" id="L57" title="1 of 4 branches missed.">        if (a instanceof Order firstOrder &amp;&amp; b instanceof Order secondOrder) {</span>
-            // Preserve direction: unlike equations, sign reversal is not valid for inequalities.
-<span class="fc" id="L59">            return polynomial(values.difference(firstOrder.upper(), firstOrder.lower()),</span>
-<span class="fc" id="L60">                values.difference(secondOrder.upper(), secondOrder.lower()));</span>
+            // Only positive rescaling preserves the directed difference's sign.
+<span class="fc" id="L59">            return checkPolynomial(values.difference(firstOrder.upper(), firstOrder.lower()),</span>
+<span class="fc" id="L60">                values.difference(secondOrder.upper(), secondOrder.lower()), Comparison.POSITIVE_SCALE);</span>
         }
 <span class="fc bfc" id="L62" title="All 4 branches covered.">        if (a instanceof Equality equation &amp;&amp; b instanceof Conjunction conjunction) {</span>
 <span class="fc" id="L63">            return oppositeOrders(equation, conjunction);</span>
@@ -132,7 +132,7 @@ final class Z3PolynomialProofRewrites {
     private boolean equivalentRealEquations(Equality first, Equality second) {
 <span class="pc bpc" id="L133" title="2 of 4 branches missed.">        if (!(first.left() instanceof Real a) || !(first.right() instanceof Real b)</span>
 <span class="pc bpc" id="L134" title="2 of 4 branches missed.">                || !(second.left() instanceof Real c) || !(second.right() instanceof Real d)) return false;</span>
-<span class="fc" id="L135">        return checkPolynomial(values.difference(a, b), values.difference(c, d), true);</span>
+<span class="fc" id="L135">        return checkPolynomial(values.difference(a, b), values.difference(c, d), Comparison.NONZERO_SCALE);</span>
     }
 
     /** null means not proved constant; REFUTED polynomial identity is not universal disequality. */
@@ -184,29 +184,33 @@ final class Z3PolynomialProofRewrites {
     }
 
     private boolean polynomial(Real left, Real right) {
-<span class="fc" id="L187">        return checkPolynomial(left, right, false);</span>
+<span class="fc" id="L187">        return checkPolynomial(left, right, Comparison.IDENTITY);</span>
     }
 
-    private boolean checkPolynomial(Real left, Real right, boolean proportional) {
-<span class="fc" id="L191">        var key = new Pair(left, right, proportional);</span>
+    private boolean checkPolynomial(Real left, Real right, Comparison comparison) {
+<span class="fc" id="L191">        var key = new Pair(left, right, comparison);</span>
 <span class="fc" id="L192">        Boolean old = cache.get(key);</span>
 <span class="fc bfc" id="L193" title="All 2 branches covered.">        if (old != null) return old;</span>
 <span class="fc" id="L194">        long estimate = (long) (left.size() + right.size()) * (left.monomials() + right.monomials());</span>
 <span class="pc bpc" id="L195" title="1 of 4 branches missed.">        if (++calls &gt; 128 || (admittedWork += estimate) &gt; 262_144) throw new Invalid();</span>
-<span class="fc bfc" id="L196" title="All 2 branches covered.">        boolean result = proportional</span>
-<span class="fc" id="L197">            ? backend.proportionalEquationDifferences(left.expression(), right.expression())</span>
-<span class="fc" id="L198">            : polynomialIdentity(left, right);</span>
-<span class="fc" id="L199">        cache.put(key, result);</span>
-<span class="fc" id="L200">        return result;</span>
+<span class="fc bfc" id="L196" title="All 3 branches covered.">        boolean result = switch (comparison) {</span>
+<span class="fc" id="L197">            case IDENTITY -&gt; polynomialIdentity(left, right);</span>
+<span class="fc" id="L198">            case NONZERO_SCALE -&gt; backend.proportionalEquationDifferences(left.expression(), right.expression());</span>
+<span class="fc" id="L199">            case POSITIVE_SCALE -&gt; backend.positivelyProportionalDifferences(left.expression(), right.expression());</span>
+        };
+<span class="fc" id="L201">        cache.put(key, result);</span>
+<span class="fc" id="L202">        return result;</span>
     }
 
     private boolean polynomialIdentity(Real left, Real right) {
-<span class="fc" id="L204">        var obligation = Obligation.create(&quot;native-polynomial-rewrite&quot;, source.declarations(), source.theories(),</span>
-<span class="fc" id="L205">            List.of(), new Goal(Relation.EQUALS, left.expression(), right.expression()),</span>
-<span class="fc" id="L206">            RequestedEvidence.SYMBOLIC_CERTIFICATE, source.provenance());</span>
-<span class="fc bfc" id="L207" title="All 2 branches covered.">        return backend.execute(obligation).result().status() == ResultStatus.CONFIRMED;</span>
+<span class="fc" id="L206">        var obligation = Obligation.create(&quot;native-polynomial-rewrite&quot;, source.declarations(), source.theories(),</span>
+<span class="fc" id="L207">            List.of(), new Goal(Relation.EQUALS, left.expression(), right.expression()),</span>
+<span class="fc" id="L208">            RequestedEvidence.SYMBOLIC_CERTIFICATE, source.provenance());</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        return backend.execute(obligation).result().status() == ResultStatus.CONFIRMED;</span>
     }
 
-<span class="fc" id="L210">    private record Pair(Real left, Real right, boolean proportional) { }</span>
+<span class="fc" id="L212">    private enum Comparison { IDENTITY, NONZERO_SCALE, POSITIVE_SCALE }</span>
+
+<span class="fc" id="L214">    private record Pair(Real left, Real right, Comparison comparison) { }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

@@ -144,7 +144,7 @@ public record PluginSourceToBinaryAttestation(
 <span class="fc" id="L144">                .map(PluginTrustStore.PublisherKey::publicKey)</span>
 <span class="fc" id="L145">                .map(PluginSourceToBinaryAttestation::ed25519Point)</span>
 <span class="fc bfc" id="L146" title="All 4 branches covered.">                .anyMatch(point -&gt; point.isXOdd() == builderPoint.isXOdd()</span>
-<span class="fc bfc" id="L147" title="All 2 branches covered.">                    &amp;&amp; point.getY().equals(builderPoint.getY()))) {</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                    &amp;&amp; point.getY().equals(builderPoint.getY()))) {</span>
 <span class="fc" id="L148">            throw new SecurityException(&quot;builder identity and key must be independent of the publisher trust store&quot;);</span>
         }
         try {
@@ -154,8 +154,8 @@ public record PluginSourceToBinaryAttestation(
 <span class="fc bfc" id="L154" title="All 2 branches covered.">            if (!verifier.verify(Base64.getDecoder().decode(signatureBase64))) {</span>
 <span class="fc" id="L155">                throw new SecurityException(&quot;invalid source-to-binary attestation signature&quot;);</span>
             }
-<span class="nc" id="L157">        } catch (GeneralSecurityException failure) {</span>
-<span class="nc" id="L158">            throw new SecurityException(&quot;unable to verify source-to-binary attestation&quot;, failure);</span>
+<span class="fc" id="L157">        } catch (GeneralSecurityException failure) {</span>
+<span class="fc" id="L158">            throw new SecurityException(&quot;unable to verify source-to-binary attestation&quot;, failure);</span>
 <span class="fc" id="L159">        }</span>
 <span class="fc" id="L160">    }</span>
 

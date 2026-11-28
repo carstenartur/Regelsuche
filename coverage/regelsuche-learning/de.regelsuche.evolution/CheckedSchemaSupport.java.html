@@ -189,140 +189,157 @@ final class CheckedSchemaSupport {
     }
     /** Total rational polynomial syntax: no functions, variable denominators or variable/negative powers. */
     static void domain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
-<span class="fc" id="L192">        domain(root, bounds, work, false);</span>
+<span class="fc" id="L192">        countedDomain(root, bounds, work);</span>
 <span class="fc" id="L193">    }</span>
 
     /** For the shared surface, a separate exact guard checks constant denominator expressions. */
     static void domain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work, boolean checkSharedSurface) {
-<span class="fc" id="L197">        var pending = new ArrayDeque&lt;Node&gt;();</span>
-<span class="fc" id="L198">        pending.push(new Node(root, 0));</span>
-<span class="fc" id="L199">        var current = new Node[1];</span>
-<span class="fc" id="L200">        var rejection = new String[1];</span>
+<span class="fc" id="L197">        countedDomain(root, bounds, work, checkSharedSurface);</span>
+<span class="fc" id="L198">    }</span>
+
+    static int countedDomain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
+<span class="fc" id="L201">        return countedDomain(root, bounds, work, false);</span>
+    }
+
+    private static int countedDomain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work, boolean checkSharedSurface) {
+<span class="fc" id="L205">        return countedDomain(root, bounds, work, checkSharedSurface, null);</span>
+    }
+
+    /** Optional whole-task operator proof shares the exact scalar-domain and node-count traversal. */
+    static int countedDomain(Expr root, CheckedLearnedSchemaModel.Bounds bounds, Work work, boolean checkSharedSurface,
+            PrimitiveSchemaReachability.OperatorScan scan) {
+<span class="fc" id="L211">        var pending = new ArrayDeque&lt;Node&gt;();</span>
+<span class="fc" id="L212">        pending.push(new Node(root, 0));</span>
+<span class="fc" id="L213">        var current = new Node[1];</span>
+<span class="fc" id="L214">        var rejection = new String[1];</span>
         // Queue/backing, root wrapper/insertion and actual current/rejection slots.
-<span class="fc" id="L202">        var retained=RetainedOperation.retainCompleted(8,root,bounds,work,pending,current,rejection);</span>
-<span class="fc" id="L203">        Throwable primary=null;</span>
+<span class="fc" id="L216">        var retained=RetainedOperation.retainCompleted(8,root,bounds,work,pending,current,rejection);</span>
+<span class="fc" id="L217">        Throwable primary=null;</span>
+<span class="fc" id="L218">        int count = 0;</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        int maximumNodes = scan == null ? bounds.maximumExpressionNodes() : scan.maximumNodes;</span>
         try {
             try {
-<span class="fc" id="L206">                int count = 0;</span>
-<span class="fc bfc" id="L207" title="All 2 branches covered.">                while (!pending.isEmpty()) {</span>
-<span class="fc" id="L208">                    var node = current[0] = pending.pop();</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">                while (!pending.isEmpty()) {</span>
+<span class="fc" id="L223">                    var node = current[0] = pending.pop();</span>
                     // The caller owns this visited-work ledger, including a failed prefix.
-<span class="fc" id="L210">                    work.add(1);</span>
-<span class="fc" id="L211">                    RetainedOperation.work(2);</span>
-<span class="fc bfc" id="L212" title="All 4 branches covered.">                    if (++count &gt; bounds.maximumExpressionNodes() || node.depth() &gt; bounds.maximumDepth()) {</span>
-<span class="fc" id="L213">                        throw new DomainRejected(&quot;checked scalar polynomial structure limit&quot;);</span>
+<span class="fc" id="L225">                    work.add(1);</span>
+<span class="fc" id="L226">                    RetainedOperation.work(2);</span>
+<span class="fc bfc" id="L227" title="All 4 branches covered.">                    if (++count &gt; maximumNodes || node.depth() &gt; bounds.maximumDepth()) {</span>
+<span class="fc" id="L228">                        throw new DomainRejected(&quot;checked scalar polynomial structure limit&quot;);</span>
                     }
-<span class="fc bfc" id="L215" title="All 4 branches covered.">                    switch (node.value()) {</span>
-<span class="fc" id="L216">                        case NumberExpr number -&gt; literal(number.value(), bounds);</span>
-<span class="fc" id="L217">                        case VariableExpr variable -&gt; {</span>
-<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                            if (variable.name().length() &gt; 128) throw new DomainRejected(&quot;checked symbol size limit&quot;);</span>
+<span class="fc bfc" id="L230" title="All 4 branches covered.">                    switch (node.value()) {</span>
+<span class="fc" id="L231">                        case NumberExpr number -&gt; literal(number.value(), bounds);</span>
+<span class="fc" id="L232">                        case VariableExpr variable -&gt; {</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">                            if (variable.name().length() &gt; 128) throw new DomainRejected(&quot;checked symbol size limit&quot;);</span>
                         }
-<span class="fc" id="L220">                        case BinaryExpr binary -&gt; {</span>
-<span class="fc bfc" id="L221" title="All 4 branches covered.">                            if (!checkSharedSurface || binary.operator() != BinaryOperator.DIV) binaryDomain(binary,bounds);</span>
-<span class="fc" id="L222">                            pending.push(new Node(binary.right(), node.depth() + 1));</span>
-<span class="fc" id="L223">                            RetainedOperation.work(2);</span>
-<span class="fc" id="L224">                            pending.push(new Node(binary.left(), node.depth() + 1));</span>
-<span class="fc" id="L225">                            RetainedOperation.work(2);</span>
-<span class="fc" id="L226">                            RetainedOperation.checkpoint();</span>
-<span class="fc" id="L227">                        }</span>
-<span class="fc" id="L228">                        default -&gt; throw new DomainRejected(&quot;outside checked scalar rational polynomial domain&quot;);</span>
+<span class="fc" id="L235">                        case BinaryExpr binary -&gt; {</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                            if (scan != null) scan.observe(binary.operator(), work);</span>
+<span class="fc bfc" id="L237" title="All 4 branches covered.">                            if (!checkSharedSurface || binary.operator() != BinaryOperator.DIV) binaryDomain(binary,bounds);</span>
+<span class="fc" id="L238">                            pending.push(new Node(binary.right(), node.depth() + 1));</span>
+<span class="fc" id="L239">                            RetainedOperation.work(2);</span>
+<span class="fc" id="L240">                            pending.push(new Node(binary.left(), node.depth() + 1));</span>
+<span class="fc" id="L241">                            RetainedOperation.work(2);</span>
+<span class="fc" id="L242">                            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L243">                        }</span>
+<span class="fc" id="L244">                        default -&gt; throw new DomainRejected(&quot;outside checked scalar rational polynomial domain&quot;);</span>
                     }
-<span class="fc" id="L230">                }</span>
-<span class="fc" id="L231">            } catch (DomainRejected rejected) {</span>
+<span class="fc" id="L246">                }</span>
+<span class="fc" id="L247">            } catch (DomainRejected rejected) {</span>
                 // A semantic rejection cannot carry a technical failure that a caller discards.
                 // Keep it as owned data until observation and release have both succeeded.
-<span class="fc" id="L234">                rejection[0]=rejected.getMessage();</span>
-<span class="fc" id="L235">                RetainedOperation.work(1);</span>
-<span class="fc" id="L236">            }</span>
-<span class="fc" id="L237">            RetainedOperation.checkpoint();</span>
-<span class="fc" id="L238">        } catch (RuntimeException | Error failure) {</span>
-<span class="fc" id="L239">            primary=failure;</span>
-<span class="fc" id="L240">            try { RetainedOperation.checkpoint(); }</span>
-<span class="nc" id="L241">            catch (RuntimeException | Error observation) {</span>
-<span class="nc bnc" id="L242" title="All 2 branches missed.">                if (observation != failure) failure.addSuppressed(observation);</span>
-<span class="fc" id="L243">            }</span>
-<span class="fc" id="L244">            throw failure;</span>
+<span class="fc" id="L250">                rejection[0]=rejected.getMessage();</span>
+<span class="fc" id="L251">                RetainedOperation.work(1);</span>
+<span class="fc" id="L252">            }</span>
+<span class="fc" id="L253">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L254">        } catch (RuntimeException | Error failure) {</span>
+<span class="fc" id="L255">            primary=failure;</span>
+<span class="fc" id="L256">            try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L257">            catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">                if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="fc" id="L259">            }</span>
+<span class="fc" id="L260">            throw failure;</span>
         } finally {
             // A resource observer may throw the same object again on close. Avoid
             // try-with-resources self-suppression replacing the original failure.
-<span class="fc bfc" id="L248" title="All 2 branches covered.">            try { if(retained!=null)retained.close(); }</span>
-<span class="fc" id="L249">            catch (RuntimeException | Error cleanup) {</span>
-<span class="fc bfc" id="L250" title="All 2 branches covered.">                if(primary==null)throw cleanup;</span>
-<span class="fc bfc" id="L251" title="All 2 branches covered.">                if(cleanup!=primary)primary.addSuppressed(cleanup);</span>
-<span class="fc" id="L252">            }</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            try { if(retained!=null)retained.close(); }</span>
+<span class="fc" id="L265">            catch (RuntimeException | Error cleanup) {</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">                if(primary==null)throw cleanup;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">                if(cleanup!=primary)primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L268">            }</span>
         }
-<span class="fc bfc" id="L254" title="All 2 branches covered.">        if(rejection[0]!=null)throw new DomainRejected(rejection[0]);</span>
-<span class="fc" id="L255">    }</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if(rejection[0]!=null)throw new DomainRejected(rejection[0]);</span>
+<span class="fc" id="L271">        return count;</span>
+    }
 
     private static void binaryDomain(BinaryExpr binary, CheckedLearnedSchemaModel.Bounds bounds) {
-<span class="fc bfc" id="L258" title="All 4 branches covered.">        if (binary.operator() == BinaryOperator.DIV &amp;&amp; (!(binary.right() instanceof NumberExpr number)</span>
-<span class="fc bfc" id="L259" title="All 2 branches covered.">                || number.value().numerator().signum() == 0)) {</span>
-<span class="fc" id="L260">            throw new DomainRejected(&quot;checked scalar division needs nonzero literal denominator&quot;);</span>
+<span class="fc bfc" id="L275" title="All 4 branches covered.">        if (binary.operator() == BinaryOperator.DIV &amp;&amp; (!(binary.right() instanceof NumberExpr number)</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">                || number.value().numerator().signum() == 0)) {</span>
+<span class="fc" id="L277">            throw new DomainRejected(&quot;checked scalar division needs nonzero literal denominator&quot;);</span>
         }
-<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>
-<span class="fc bfc" id="L263" title="All 2 branches covered.">            if (!(binary.right() instanceof NumberExpr number)</span>
-<span class="pc bpc" id="L264" title="1 of 4 branches missed.">                    || !number.value().isInteger() || number.value().numerator().signum() &lt; 0) {</span>
-<span class="fc" id="L265">                throw new DomainRejected(&quot;checked scalar power needs bounded nonnegative literal exponent&quot;);</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            if (!(binary.right() instanceof NumberExpr number)</span>
+<span class="pc bpc" id="L281" title="1 of 4 branches missed.">                    || !number.value().isInteger() || number.value().numerator().signum() &lt; 0) {</span>
+<span class="fc" id="L282">                throw new DomainRejected(&quot;checked scalar power needs bounded nonnegative literal exponent&quot;);</span>
             }
-<span class="fc" id="L267">            var maximum = java.math.BigInteger.valueOf(bounds.maximumExponent());</span>
-<span class="fc" id="L268">            var retained = RetainedOperation.retainCompleted(1, binary, bounds, maximum);</span>
-<span class="fc" id="L269">            Throwable primary = null;</span>
+<span class="fc" id="L284">            var maximum = java.math.BigInteger.valueOf(bounds.maximumExponent());</span>
+<span class="fc" id="L285">            var retained = RetainedOperation.retainCompleted(1, binary, bounds, maximum);</span>
+<span class="fc" id="L286">            Throwable primary = null;</span>
             boolean rejected;
             try {
-<span class="fc bfc" id="L272" title="All 2 branches covered.">                rejected = number.value().numerator().compareTo(maximum) &gt; 0;</span>
-<span class="fc" id="L273">                RetainedOperation.work(1);</span>
-<span class="nc" id="L274">            } catch (RuntimeException | Error failure) {</span>
-<span class="nc" id="L275">                primary = failure;</span>
-<span class="nc" id="L276">                observeGuardFailure(failure);</span>
-<span class="nc" id="L277">                throw failure;</span>
-<span class="fc" id="L278">            } finally { closeGuard(retained, primary); }</span>
-<span class="fc bfc" id="L279" title="All 2 branches covered.">            if (rejected) throw new DomainRejected(&quot;checked scalar power needs bounded nonnegative literal exponent&quot;);</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">                rejected = number.value().numerator().compareTo(maximum) &gt; 0;</span>
+<span class="fc" id="L290">                RetainedOperation.work(1);</span>
+<span class="nc" id="L291">            } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L292">                primary = failure;</span>
+<span class="nc" id="L293">                observeGuardFailure(failure);</span>
+<span class="nc" id="L294">                throw failure;</span>
+<span class="fc" id="L295">            } finally { closeGuard(retained, primary); }</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            if (rejected) throw new DomainRejected(&quot;checked scalar power needs bounded nonnegative literal exponent&quot;);</span>
         }
-<span class="fc" id="L281">    }</span>
+<span class="fc" id="L298">    }</span>
 
     private static void literal(ExactRational value, CheckedLearnedSchemaModel.Bounds bounds) {
-<span class="fc" id="L284">        var absolute = value.numerator().abs();</span>
-<span class="fc" id="L285">        var retained = RetainedOperation.retainCompleted(1, value, bounds, absolute);</span>
-<span class="fc" id="L286">        Throwable primary = null;</span>
+<span class="fc" id="L301">        var absolute = value.numerator().abs();</span>
+<span class="fc" id="L302">        var retained = RetainedOperation.retainCompleted(1, value, bounds, absolute);</span>
+<span class="fc" id="L303">        Throwable primary = null;</span>
         boolean rejected;
         try {
-<span class="fc bfc" id="L289" title="All 2 branches covered.">            rejected = absolute.bitLength() &gt; bounds.maximumCoefficientBits();</span>
-<span class="fc" id="L290">            RetainedOperation.work(1);</span>
-<span class="fc bfc" id="L291" title="All 2 branches covered.">            if (!rejected) {</span>
-<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                rejected = value.denominator().bitLength() &gt; bounds.maximumCoefficientBits();</span>
-<span class="fc" id="L293">                RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            rejected = absolute.bitLength() &gt; bounds.maximumCoefficientBits();</span>
+<span class="fc" id="L307">            RetainedOperation.work(1);</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">            if (!rejected) {</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">                rejected = value.denominator().bitLength() &gt; bounds.maximumCoefficientBits();</span>
+<span class="fc" id="L310">                RetainedOperation.work(1);</span>
             }
-<span class="nc" id="L295">        } catch (RuntimeException | Error failure) {</span>
-<span class="nc" id="L296">            primary = failure;</span>
-<span class="nc" id="L297">            observeGuardFailure(failure);</span>
-<span class="nc" id="L298">            throw failure;</span>
-<span class="fc" id="L299">        } finally { closeGuard(retained, primary); }</span>
+<span class="nc" id="L312">        } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L313">            primary = failure;</span>
+<span class="nc" id="L314">            observeGuardFailure(failure);</span>
+<span class="nc" id="L315">            throw failure;</span>
+<span class="fc" id="L316">        } finally { closeGuard(retained, primary); }</span>
         // A technical observation/release failure must never become a discarded domain rejection.
-<span class="fc bfc" id="L301" title="All 2 branches covered.">        if (rejected) throw new DomainRejected(&quot;checked rational literal size limit&quot;);</span>
-<span class="fc" id="L302">    }</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        if (rejected) throw new DomainRejected(&quot;checked rational literal size limit&quot;);</span>
+<span class="fc" id="L319">    }</span>
 
     private static void observeGuardFailure(Throwable failure) {
-<span class="nc" id="L305">        try { RetainedOperation.checkpoint(); }</span>
-<span class="nc" id="L306">        catch (RuntimeException | Error observation) {</span>
-<span class="nc bnc" id="L307" title="All 2 branches missed.">            if (observation != failure) failure.addSuppressed(observation);</span>
-<span class="nc" id="L308">        }</span>
-<span class="nc" id="L309">    }</span>
+<span class="nc" id="L322">        try { RetainedOperation.checkpoint(); }</span>
+<span class="nc" id="L323">        catch (RuntimeException | Error observation) {</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">            if (observation != failure) failure.addSuppressed(observation);</span>
+<span class="nc" id="L325">        }</span>
+<span class="nc" id="L326">    }</span>
 
     private static void closeGuard(RetainedOperation.Frame retained, Throwable primary) {
-<span class="fc bfc" id="L312" title="All 2 branches covered.">        try { if (retained != null) retained.close(); }</span>
-<span class="nc" id="L313">        catch (RuntimeException | Error cleanup) {</span>
-<span class="nc bnc" id="L314" title="All 2 branches missed.">            if (primary == null) throw cleanup;</span>
-<span class="nc bnc" id="L315" title="All 2 branches missed.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
-<span class="fc" id="L316">        }</span>
-<span class="fc" id="L317">    }</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        try { if (retained != null) retained.close(); }</span>
+<span class="nc" id="L330">        catch (RuntimeException | Error cleanup) {</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">            if (primary == null) throw cleanup;</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">            if (cleanup != primary) primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L333">        }</span>
+<span class="fc" id="L334">    }</span>
 
     private static String polynomialText(Expr expression) {
-<span class="pc bpc" id="L320" title="1 of 4 branches missed.">        return switch (expression) {</span>
-<span class="fc" id="L321">            case NumberExpr number -&gt; &quot;(&quot; + number.value().canonicalText() + &quot;)&quot;;</span>
-<span class="fc" id="L322">            case VariableExpr variable -&gt; variable.name();</span>
-<span class="fc" id="L323">            case BinaryExpr binary -&gt; &quot;(&quot; + polynomialText(binary.left()) + binary.operator().symbol()</span>
-<span class="fc" id="L324">                + polynomialText(binary.right()) + &quot;)&quot;;</span>
-<span class="nc" id="L325">            default -&gt; throw new IllegalArgumentException(&quot;not a symbolic polynomial&quot;);</span>
+<span class="pc bpc" id="L337" title="1 of 4 branches missed.">        return switch (expression) {</span>
+<span class="fc" id="L338">            case NumberExpr number -&gt; &quot;(&quot; + number.value().canonicalText() + &quot;)&quot;;</span>
+<span class="fc" id="L339">            case VariableExpr variable -&gt; variable.name();</span>
+<span class="fc" id="L340">            case BinaryExpr binary -&gt; &quot;(&quot; + polynomialText(binary.left()) + binary.operator().symbol()</span>
+<span class="fc" id="L341">                + polynomialText(binary.right()) + &quot;)&quot;;</span>
+<span class="nc" id="L342">            default -&gt; throw new IllegalArgumentException(&quot;not a symbolic polynomial&quot;);</span>
         };
     }
 }

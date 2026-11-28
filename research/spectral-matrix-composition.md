@@ -1,6 +1,6 @@
 # Spektrale Reparatur, Matrixzentren und zusammengesetzte Rechenpläne
 
-Stand: 27. November 2026. Die drei Verfahren sind typisierte Java-Kern- und
+Stand: 28. November 2026. Die drei Verfahren sind typisierte Java-Kern- und
 SDK-Funktionen im Quellstand `0.5.4-SNAPSHOT`. Die veröffentlichte Version
 0.5.3 enthält sie nicht. Diese Seite beschreibt den mathematischen Vertrag
 und reproduzierbare endliche Vergleiche.
@@ -97,7 +97,8 @@ Reparaturpläne und übernimmt ausschließlich strikte Verbesserungen.
 
 Alle vier Prädiktorläufe, Mischungen, Decoder, Vorzeichen, Synthesen und
 Schlusskombinationen zählen. Der direkte Vergleich verwendet denselben
-sparsamen Interpreter mit identischen Null- und Einskonventionen. Die
+sparsamen Interpreter. Gleiche Produkte einer Eingabekoordinate mit demselben
+rationalen Faktor stehen allen Ausgabezeilen einer Matrixanwendung zur Verfügung. Die
 Aufbewahrung eines kompilierten Plans wird vor seiner Anlage im kumulativen
 Speicheretat reserviert. Ein noch gehaltener direkter Plan bleibt während
 der Prüfung späterer Kandidaten belastet.
@@ -131,13 +132,20 @@ Erwerbsarbeit wird nicht als gemessene Null ausgegeben.
 
 | Fall | Starke direkte Kontrolle | Kandidat | Aussage |
 | --- | ---: | ---: | --- |
-| Drei rationale Eingabevektoren, Ordnung drei, wechselnde Träger `{0}`, `{1}`, `{2}` | 21 Operationen | 162 Operationen | Die Reparatur funktioniert; automatische Auswahl behält direkt. |
-| Separate vorgegebene Eigenbasis | 120 Operationen | 110 Operationen | Spektral direkte Ausführung gewinnt; dies ist kein Reparaturgewinn. |
-| $(Cx)\odot(Cy)$ mit $C=I-\mathbf1\mathbf1^T/8$ | 248 Operationen je Paar | 54 Operationen je Paar | Beide linearen Vorstufen werden durch generische Residualsuche verbessert. |
+| Drei rationale Eingabevektoren, Ordnung drei, wechselnde Träger `{0}`, `{1}`, `{2}` | 18 Operationen | 158 Operationen | Die Reparatur funktioniert; automatische Auswahl behält direkt. |
+| Zweierbatch, vorgegebene obere Bidiagonalbasis mit sieben Einsen auf der Nebendiagonale | 78 Operationen | 92 Operationen | Die direkte Ausführung gewinnt nach Wiederverwendung gleicher Produkte. |
+| Zweierbatch, obere Bidiagonalbasis mit Nebendiagonale $(-1,-1,2,-1,1,1,1)$ | 104 Operationen | 102 Operationen | Die automatische Auswahl verwendet den spektral direkten Plan. |
+| $(Cx)\odot(Cy)$ mit $C=I-\mathbf1\mathbf1^T/8$ | 152 Operationen je Paar | 40 Operationen je Paar | Beide linearen Vorstufen werden durch generische Residualsuche verbessert. |
 
-Beim letzten Fall kosten U und V jeweils acht konstante Multiplikationen
-und 15 Additionen; W kostet null, hinzu kommen acht variable Produkte.
-Drei Paare kosten entsprechend 744 gegenüber 162 Operationen. Für
+Die Residualsuche erkennt bei jeder Zentrierung die Differenz zur
+Einheitsmatrix als Rang-eins-Operator. Je Vektor genügen sieben Additionen für
+die Koordinatensumme, eine Multiplikation mit $-1/8$ und acht Additionen für
+die Ausgabekoordinaten. Mit den acht komponentenweisen Produkten sind das
+$2(7+1+8)+8=40$ Operationen. Auch die direkte Ausgangsmatrix verwendet
+gleiche Produkte in mehreren Zeilen. Je Eingabekoordinate fallen dort zwei
+verschiedene Skalierungen an und je Ausgabezeile sieben Additionen, insgesamt
+$2(16+56)+8=152$. Drei unabhängige Paare kosten entsprechend 120 bzw. 456
+Operationen. Für
 $x=y=(1,\ldots,8)$ ist das unabhängige Ergebnis
 $(49/4,25/4,9/4,1/4,1/4,9/4,25/4,49/4)$.
 
@@ -169,9 +177,9 @@ Die [externen Beispiele](../../examples/external-consumers/checked-math-java25/R
 verwenden ausschließlich das aufgelöste SDK. Ihre Tests prüfen konkrete
 Ausgaben; die Programme prüfen ihre Belege zusätzlich unabhängig.
 
-### Ausgeführte Prüfung dieses Änderungsstands
+### Historische Prüfung der ersten Integration
 
-Der lokale Lauf mit OpenJDK 25.0.5+8 und Maven 3.9.16 umfasst die vollständige
+Der [Stand vom 27. November](https://github.com/carstenartur/Regelsuche/tree/767da970ef0ebf6c195c0370f674673efb3bf166) wurde vor der gemeinsamen Wiederverwendung von Produkten geprüft. Der lokale Lauf mit OpenJDK 25.0.5+8 und Maven 3.9.16 umfasst die vollständige
 SDK-Abhängigkeitsclosure: 1.234 Kerntests, 181 E-Graph-Tests, 811 Suchtests,
 45 Validierungstests, 991 Mathematiktests und 374 SDK-Tests. Von den insgesamt
 3.636 erfassten Fällen bestanden 3.635 ohne Fehler. Die bestehende optionale
@@ -181,7 +189,7 @@ wegen der nicht gesetzten Eigenschaft `externalObservationMetricsOutput`
 
 Das anschließend aus dem installierten Quell-SDK aufgelöste unabhängige
 Maven-Projekt bestand alle zehn Ergebnisprüfungen und führte alle zehn
-Programme aus. Die oben genannten Ausgaben und Kosten 162/21 sowie 54/248
+Programme aus. Die für diesen früheren Stand ermittelten Kosten 162/21 sowie 54/248
 wurden dabei erneut beobachtet. Zusätzlich bestanden die 17 geänderten
 Produktionsklassen, acht Testklassen und fünf geänderten externen
 Beispiel-/Testklassen `javac -Xlint:all -Werror`.

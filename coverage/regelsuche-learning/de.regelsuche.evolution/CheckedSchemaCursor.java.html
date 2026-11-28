@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /** One retained match/application at most; never traverses or instantiates later sites eagerly. */
-final class CheckedSchemaCursor&lt;T&gt; implements ObjectSource&lt;T&gt;,RetainedGraph.View {
+class CheckedSchemaCursor&lt;T&gt; implements ObjectSource&lt;T&gt;,RetainedGraph.View {
 <span class="fc" id="L30">        @Override public void retainedReferences(RetainedGraph.Visitor v){v.reference(plan);v.reference(encodedSource);v.reference(meter);v.reference(pending);v.reference(source);v.reference(occurrence);v.reference(relevant);v.reference(matchedEntry);v.reference(bindings);v.reference(application);v.reference(applicationWork);v.reference(initializationWork);v.reference(payment);v.reference(ready);v.reference(result);v.reference(mathematics);v.reference(status);}</span>
 <span class="fc" id="L31">    private static final CompiledAstReplayCodec CODEC = new CompiledAstReplayCodec();</span>
 <span class="fc" id="L32">    private record Occurrence(Expr expression, List&lt;Integer&gt; path)  implements RetainedGraph.View {</span>
@@ -59,262 +59,371 @@ final class CheckedSchemaCursor&lt;T&gt; implements ObjectSource&lt;T&gt;,Retain
 <span class="fc" id="L59">        this.result=result;this.mathematics=mathematics;complete=plan.allSchemasIncluded();</span>
 <span class="fc" id="L60">    }</span>
     static Source legacy(CheckedSchemaMatcherPlan plan,String encodedSource,Meter meter) {
-<span class="fc" id="L62">        var cursor=new CheckedSchemaCursor&lt;&gt;(plan,encodedSource,null,meter,</span>
-            CheckedSchemaMatcherPlan.ApplicationSteps::result,Transformation::executionWork);
-<span class="fc" id="L64">        return new Source() {</span>
-<span class="fc" id="L65">            @Override public Optional&lt;Transformation&gt; next(long allowance){return cursor.next(allowance);}</span>
-<span class="fc" id="L66">            @Override public Status status(){return cursor.status();}</span>
-<span class="fc" id="L67">            @Override public void close(){cursor.close();}</span>
+<span class="fc" id="L62">        return legacy(plan, encodedSource, meter, null);</span>
+    }
+    static Source legacy(CheckedSchemaMatcherPlan plan,String encodedSource,Meter meter, CheckedDomainSizeReceipts receipts) {
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        var cursor=receipts == null ? new CheckedSchemaCursor&lt;&gt;(plan,encodedSource,null,meter,</span>
+            CheckedSchemaMatcherPlan.ApplicationSteps::result,Transformation::executionWork)
+<span class="fc" id="L67">            : new SelectedCursor(plan, encodedSource, meter, receipts);</span>
+<span class="fc" id="L68">        return new Source() {</span>
+<span class="fc" id="L69">            @Override public Optional&lt;Transformation&gt; next(long allowance){return cursor.next(allowance);}</span>
+<span class="fc" id="L70">            @Override public Status status(){return cursor.status();}</span>
+<span class="fc" id="L71">            @Override public void close(){cursor.close();}</span>
         };
     }
     static ObjectSource&lt;NativeMoveProof&gt; nativeSource(CheckedSchemaMatcherPlan plan,Expr source,Meter meter) {
-<span class="fc" id="L71">        return new CheckedSchemaCursor&lt;&gt;(plan,null,source,meter,NativeResult.INSTANCE,NativeMathematics.INSTANCE);</span>
+<span class="fc" id="L75">        return new CheckedSchemaCursor&lt;&gt;(plan,null,source,meter,NativeResult.INSTANCE,NativeMathematics.INSTANCE);</span>
     }
-<span class="fc" id="L73">    private enum NativeResult implements Function&lt;CheckedSchemaMatcherPlan.ApplicationSteps,NativeMoveProof&gt;,RetainedGraph.View {</span>
-<span class="fc" id="L74">        INSTANCE;</span>
-<span class="fc" id="L75">        @Override public NativeMoveProof apply(CheckedSchemaMatcherPlan.ApplicationSteps steps){return steps.nativeResult();}</span>
-<span class="fc" id="L76">        @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
+<span class="fc" id="L77">    private enum NativeResult implements Function&lt;CheckedSchemaMatcherPlan.ApplicationSteps,NativeMoveProof&gt;,RetainedGraph.View {</span>
+<span class="fc" id="L78">        INSTANCE;</span>
+<span class="fc" id="L79">        @Override public NativeMoveProof apply(CheckedSchemaMatcherPlan.ApplicationSteps steps){return steps.nativeResult();}</span>
+<span class="fc" id="L80">        @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
     }
-<span class="fc" id="L78">    private enum NativeMathematics implements Function&lt;NativeMoveProof,ExecutionWork&gt;,RetainedGraph.View {</span>
-<span class="fc" id="L79">        INSTANCE;</span>
-<span class="fc" id="L80">        @Override public ExecutionWork apply(NativeMoveProof proof){return proof.work();}</span>
-<span class="fc" id="L81">        @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
+<span class="fc" id="L82">    private enum NativeMathematics implements Function&lt;NativeMoveProof,ExecutionWork&gt;,RetainedGraph.View {</span>
+<span class="fc" id="L83">        INSTANCE;</span>
+<span class="fc" id="L84">        @Override public ExecutionWork apply(NativeMoveProof proof){return proof.work();}</span>
+<span class="fc" id="L85">        @Override public void retainedReferences(RetainedGraph.Visitor v){}</span>
     }
     @Override public Optional&lt;T&gt; next(long allowance) {
-<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (allowance &lt; 0) throw new IllegalArgumentException(&quot;negative schema allowance&quot;);</span>
-<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (terminal()) return Optional.empty();</span>
-<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (allowance == 0) { status=Status.LIMIT;return Optional.empty(); }</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (allowance &lt; 0) throw new IllegalArgumentException(&quot;negative schema allowance&quot;);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (terminal()) return Optional.empty();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (allowance == 0) { status=Status.LIMIT;return Optional.empty(); }</span>
         try {
-<span class="fc" id="L88">            long before=total();</span>
-<span class="fc" id="L89">            var returned=new Object[1];</span>
-<span class="fc" id="L90">            var held=RetainedOperation.retainCompleted(2,this,returned);</span>
-<span class="fc" id="L91">            Throwable primary=null;</span>
+<span class="fc" id="L92">            long before=total();</span>
+<span class="fc" id="L93">            var returned=new Object[1];</span>
+<span class="fc" id="L94">            var held=RetainedOperation.retainCompleted(2,this,returned);</span>
+<span class="fc" id="L95">            Throwable primary=null;</span>
             try {
-<span class="fc" id="L93">                returned[0]=pull(allowance,before);RetainedOperation.work(1);RetainedOperation.checkpoint();</span>
-<span class="fc" id="L94">            } catch(RuntimeException | Error failure) {</span>
-<span class="fc" id="L95">                primary=failure;observeFailure(failure);throw failure;</span>
-<span class="fc" id="L96">            } finally {closeFrame(held,primary);}</span>
-<span class="fc" id="L97">            @SuppressWarnings(&quot;unchecked&quot;) var result=(Optional&lt;T&gt;)returned[0];</span>
-<span class="fc" id="L98">            return result;</span>
-<span class="fc" id="L99">        } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L97">                returned[0]=pull(allowance,before);RetainedOperation.work(1);RetainedOperation.checkpoint();</span>
+<span class="fc" id="L98">            } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L99">                primary=failure;observeFailure(failure);throw failure;</span>
+<span class="fc" id="L100">            } finally {closeFrame(held,primary);}</span>
+<span class="fc" id="L101">            @SuppressWarnings(&quot;unchecked&quot;) var result=(Optional&lt;T&gt;)returned[0];</span>
+<span class="fc" id="L102">            return result;</span>
+<span class="fc" id="L103">        } catch(RuntimeException | Error failure) {</span>
             // Covers total(), construction, reconciliation, result publication and final owner release.
-<span class="fc" id="L101">            complete=false;status=Status.FAILED;</span>
-<span class="fc" id="L102">            throw failure;</span>
+<span class="fc" id="L105">            complete=false;status=Status.FAILED;</span>
+<span class="fc" id="L106">            throw failure;</span>
         }
     }
     private Optional&lt;T&gt; pull(long allowance,long before) {
         // A positive pull must advance one existing atomic action, even if its owner setup
         // already exhausted the allowance. Its entire overrun remains charged from before.
-<span class="fc" id="L108">        boolean first=true;</span>
-<span class="fc bfc" id="L109" title="All 4 branches covered.">        while (first || total() - before &lt; allowance) {</span>
-<span class="fc" id="L110">            first=false;</span>
-<span class="fc" id="L111">            status = Status.READY;</span>
-<span class="fc bfc" id="L112" title="All 2 branches covered.">            if (ready != null) return emit();</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (!initialized) initialize();</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">            else if (matchedEntry != null) advanceApplication();</span>
-<span class="fc bfc" id="L115" title="All 2 branches covered.">            else if (occurrence == null) advance();</span>
-<span class="fc bfc" id="L116" title="All 2 branches covered.">            else if (schemaIndex &lt; Math.min(relevant.size(), plan.maximumSchemasPerOccurrence())) match();</span>
-<span class="fc" id="L117">            else descend();</span>
-<span class="fc" id="L118">            de.regelsuche.retention.RetainedOperation.work(1);</span>
-<span class="fc" id="L119">            de.regelsuche.retention.RetainedOperation.checkpoint();</span>
-<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (terminal()) return Optional.empty();</span>
+<span class="fc" id="L112">        boolean first=true;</span>
+<span class="fc bfc" id="L113" title="All 4 branches covered.">        while (first || total() - before &lt; allowance) {</span>
+<span class="fc" id="L114">            first=false;</span>
+<span class="fc" id="L115">            status = Status.READY;</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (ready != null) return emit();</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            if (!initialized) initialize();</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            else if (matchedEntry != null) advanceApplication();</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            else if (occurrence == null) advance();</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            else if (schemaIndex &lt; Math.min(relevant.size(), plan.maximumSchemasPerOccurrence())) match();</span>
+<span class="fc" id="L121">            else descend();</span>
+<span class="fc" id="L122">            de.regelsuche.retention.RetainedOperation.work(1);</span>
+<span class="fc" id="L123">            de.regelsuche.retention.RetainedOperation.checkpoint();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (terminal()) return Optional.empty();</span>
         }
-<span class="fc" id="L122">        status = Status.LIMIT;</span>
-<span class="fc" id="L123">        return Optional.empty();</span>
+<span class="fc" id="L126">        status = Status.LIMIT;</span>
+<span class="fc" id="L127">        return Optional.empty();</span>
     }
-<span class="pc bpc" id="L125" title="1 of 8 branches missed.">    private boolean terminal() { return status == Status.EXHAUSTED || status == Status.INCONCLUSIVE || status == Status.FAILED || status == Status.CLOSED; }</span>
-<span class="fc" id="L126">    private long total() { return Math.addExact(meter.work().metrics().totalWorkUnitsV2(),</span>
-<span class="fc bfc" id="L127" title="All 2 branches covered.">        encodedSource==null?de.regelsuche.retention.RetainedOperation.observedWork():0); }</span>
+<span class="pc bpc" id="L129" title="1 of 8 branches missed.">    private boolean terminal() { return status == Status.EXHAUSTED || status == Status.INCONCLUSIVE || status == Status.FAILED || status == Status.CLOSED; }</span>
+<span class="fc" id="L130">    private long total() { return Math.addExact(meter.work().metrics().totalWorkUnitsV2(),</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        encodedSource==null?de.regelsuche.retention.RetainedOperation.observedWork():0); }</span>
     private void initialize() {
-<span class="fc" id="L129">        initialized=true;initializationWork=new Work();initializationWork.add(1);</span>
-<span class="fc" id="L130">        Throwable primary=null;</span>
+<span class="fc" id="L133">        initialized=true;initializationWork=new Work();initializationWork.add(1);</span>
+<span class="fc" id="L134">        Throwable primary=null;</span>
         try {
-<span class="fc" id="L132">            var held=RetainedOperation.retainCompleted(1,this);</span>
-<span class="fc" id="L133">            Throwable bodyFailure=null;</span>
+<span class="fc" id="L136">            var held=RetainedOperation.retainCompleted(1,this);</span>
+<span class="fc" id="L137">            Throwable bodyFailure=null;</span>
             try {
                 try {
-<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                    if(loadSource()) {</span>
-<span class="fc" id="L137">                        domain(source,plan.bounds(),initializationWork);</span>
-<span class="fc bfc" id="L138" title="All 2 branches covered.">                        pending.push(new Occurrence(source,plan.indexedDispatch() ? SharedOccurrencePath.root() : List.of()));</span>
-<span class="nc" id="L139">                    } else {complete=false;status=Status.INCONCLUSIVE;}</span>
-<span class="fc" id="L140">                } catch(AstExpressionValidation.InvalidExpression | DomainRejected unsupported) {</span>
-<span class="fc" id="L141">                    complete=false;status=Status.INCONCLUSIVE;</span>
-<span class="fc" id="L142">                }</span>
-<span class="fc" id="L143">            } catch(RuntimeException | Error failure) {</span>
-<span class="fc" id="L144">                bodyFailure=failure;observeFailure(failure);throw failure;</span>
-<span class="fc" id="L145">            } finally {closeFrame(held,bodyFailure);}</span>
-<span class="fc" id="L146">        } catch(RuntimeException | Error failure) {</span>
-<span class="fc" id="L147">            primary=failure;throw failure;</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">                    if(loadSource()) {</span>
+<span class="fc" id="L141">                        int nodes = inspect(source,plan.bounds(),initializationWork);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                        if (plan.selectsSites()) {</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                            if (nodes &lt; plan.minimumNodes()) finishSelection();</span>
+<span class="fc" id="L144">                            else enqueue(source, 0, 0, nodes, initializationWork);</span>
+                        } else {
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                            pending.push(new Occurrence(source,plan.indexedDispatch() ? SharedOccurrencePath.root() : List.of()));</span>
+                        }
+<span class="pc" id="L148">                    } else {complete=false;status=Status.INCONCLUSIVE;}</span>
+<span class="fc" id="L149">                } catch(AstExpressionValidation.InvalidExpression | DomainRejected unsupported) {</span>
+<span class="fc" id="L150">                    complete=false;status=Status.INCONCLUSIVE;</span>
+<span class="fc" id="L151">                }</span>
+<span class="fc" id="L152">            } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L153">                bodyFailure=failure;observeFailure(failure);throw failure;</span>
+<span class="fc" id="L154">            } finally {closeFrame(held,bodyFailure);}</span>
+<span class="fc" id="L155">        } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L156">            primary=failure;throw failure;</span>
         } finally {
             // Existing LOAD receipt remains the sole owner even after failed acquisition/close.
-<span class="fc" id="L150">            try {meter.charge(Operation.LOAD,initializationWork.units);initializationWork=null;}</span>
-<span class="nc" id="L151">            catch(RuntimeException | Error paymentFailure) {</span>
-<span class="nc bnc" id="L152" title="All 2 branches missed.">                if(primary==null)throw paymentFailure;</span>
-<span class="nc bnc" id="L153" title="All 2 branches missed.">                if(paymentFailure!=primary)primary.addSuppressed(paymentFailure);</span>
-<span class="fc" id="L154">            }</span>
+<span class="fc" id="L159">            try {meter.charge(Operation.LOAD,initializationWork.units);initializationWork=null;}</span>
+<span class="nc" id="L160">            catch(RuntimeException | Error paymentFailure) {</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                if(primary==null)throw paymentFailure;</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                if(paymentFailure!=primary)primary.addSuppressed(paymentFailure);</span>
+<span class="fc" id="L163">            }</span>
         }
-<span class="fc" id="L156">    }</span>
+<span class="fc" id="L165">    }</span>
+    int inspect(Expr expression, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
+<span class="fc" id="L167">        return countedDomain(expression, bounds, work);</span>
+    }
+<span class="fc" id="L169">    void rememberTarget(CheckedSchemaMatcherPlan.ApplicationSteps completed, Meter meter) {}</span>
+
+    private static final class SelectedCursor extends CheckedSchemaCursor&lt;Transformation&gt; {
+        private final CheckedDomainSizeReceipts receipts;
+        SelectedCursor(CheckedSchemaMatcherPlan plan, String encodedSource, Meter meter, CheckedDomainSizeReceipts receipts) {
+<span class="fc" id="L174">            super(plan, encodedSource, null, meter, CheckedSchemaMatcherPlan.ApplicationSteps::result, Transformation::executionWork);</span>
+<span class="fc" id="L175">            this.receipts = receipts;</span>
+<span class="fc" id="L176">        }</span>
+        @Override int inspect(Expr expression, CheckedLearnedSchemaModel.Bounds bounds, Work work) {
+<span class="fc" id="L178">            Integer size = receipts.size(expression, work);</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            return size == null ? super.inspect(expression, bounds, work) : size;</span>
+        }
+        @Override void rememberTarget(CheckedSchemaMatcherPlan.ApplicationSteps completed, Meter meter) {
+<span class="fc" id="L182">            var work = new Work();</span>
+<span class="fc" id="L183">            completed.rememberTarget(receipts, work);</span>
+<span class="fc" id="L184">            meter.charge(Operation.MATCH, work.units);</span>
+<span class="fc" id="L185">        }</span>
+        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
+<span class="nc" id="L187">            super.retainedReferences(visitor); visitor.reference(receipts);</span>
+<span class="nc" id="L188">        }</span>
+    }
     private boolean loadSource() {
-<span class="fc bfc" id="L158" title="All 2 branches covered.">        if(encodedSource!=null) {</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if(encodedSource!=null) {</span>
             // Historical codec boundary; native calls do not enter or generalize this catch.
             try {
-<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                if(encodedSource.length()&gt;262144)throw new IllegalArgumentException(&quot;schema source transport size limit&quot;);</span>
-<span class="fc" id="L162">                source=CODEC.decodeExpression(encodedSource);return true;</span>
-<span class="nc" id="L163">            } catch(IllegalArgumentException unsupported){return false;}</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                if(encodedSource.length()&gt;262144)throw new IllegalArgumentException(&quot;schema source transport size limit&quot;);</span>
+<span class="fc" id="L195">                source=CODEC.decodeExpression(encodedSource);return true;</span>
+<span class="nc" id="L196">            } catch(IllegalArgumentException unsupported){return false;}</span>
         }
-<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if(AstExpressionValidation.inspect(source).canonicalCharacters()&gt;262144)</span>
-<span class="nc" id="L166">            throw new AstExpressionValidation.InvalidExpression(&quot;schema source transport size limit&quot;);</span>
-<span class="fc" id="L167">        return true;</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if(AstExpressionValidation.inspect(source).canonicalCharacters()&gt;262144)</span>
+<span class="nc" id="L199">            throw new AstExpressionValidation.InvalidExpression(&quot;schema source transport size limit&quot;);</span>
+<span class="fc" id="L200">        return true;</span>
     }
+    /** Path bits are valid through the checked model's maximum supported depth of 64. */
+    private static final class SelectedPath extends java.util.AbstractList&lt;Integer&gt; implements RetainedGraph.View {
+        private final int depth;
+        private final long edges;
+        private final int nodeBound;
+<span class="fc" id="L207">        SelectedPath(int depth, long edges, int nodeBound) { this.depth = depth; this.edges = edges; this.nodeBound = nodeBound; }</span>
+<span class="fc" id="L208">        @Override public int size() { return depth; }</span>
+        @Override public Integer get(int index) {
+<span class="fc" id="L210">            java.util.Objects.checkIndex(index, depth);</span>
+<span class="fc" id="L211">            return (int) ((edges &gt;&gt;&gt; index) &amp; 1);</span>
+        }
+<span class="nc" id="L213">        @Override public void retainedReferences(RetainedGraph.Visitor visitor) {}</span>
+    }
+
+    private void enqueue(Expr expression, int depth, long edges, int nodeBound, Work work) {
+<span class="fc" id="L217">        work.add(1);</span>
+<span class="pc bpc" id="L218" title="1 of 6 branches missed.">        if (nodeBound &gt;= plan.minimumNodes() &amp;&amp; (expression instanceof BinaryExpr || plan.selectsLeaves())) {</span>
+<span class="fc" id="L219">            pending.push(new Occurrence(expression, new SelectedPath(depth, edges, nodeBound)));</span>
+<span class="fc" id="L220">            work.add(2); // Packed location and queue insertion.</span>
+        }
+<span class="fc" id="L222">    }</span>
+
+    private void advanceSelected() {
+        // Locations whose root shapes are impossible never open an exact matcher.
+<span class="fc" id="L226">        var expression = occurrence.expression();</span>
+<span class="fc" id="L227">        var work = new Work();</span>
+<span class="fc" id="L228">        relevant = plan.selectedRange(expression, work);</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (relevant != null) {</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">            if (relevant.size() &gt; plan.maximumSchemasPerOccurrence()) complete = false;</span>
+<span class="fc" id="L231">            remainingSchemas = plan.selectedMask(expression, work);</span>
+<span class="fc" id="L232">            schemaIndex = Long.numberOfTrailingZeros(remainingSchemas);</span>
+        }
+<span class="fc bfc" id="L234" title="All 4 branches covered.">        if (relevant == null || remainingSchemas == 0) {</span>
+<span class="fc" id="L235">            queueSelectedChildren(work);</span>
+<span class="fc" id="L236">            occurrence = null;</span>
+        }
+<span class="fc" id="L238">        meter.charge(Operation.MATCH, work.units);</span>
+<span class="fc" id="L239">    }</span>
+    private void queueSelectedChildren(Work work) {
+<span class="fc" id="L241">        var path = (SelectedPath) occurrence.path();</span>
+<span class="pc bpc" id="L242" title="1 of 4 branches missed.">        if (occurrence.expression() instanceof BinaryExpr binary &amp;&amp; path.nodeBound &gt;= plan.minimumNodes() + 2) {</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            int rightBound = path.nodeBound - (binary.left() instanceof BinaryExpr ? 4 : 2);</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            int leftBound = path.nodeBound - (binary.right() instanceof BinaryExpr ? 4 : 2);</span>
+<span class="fc" id="L245">            enqueue(binary.right(), path.depth + 1, path.edges | (1L &lt;&lt; path.depth), rightBound, work);</span>
+<span class="fc" id="L246">            enqueue(binary.left(), path.depth + 1, path.edges, leftBound, work);</span>
+        }
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (pending.isEmpty()) finishSelection();</span>
+<span class="fc" id="L249">    }</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">    private void finishSelection() { status = complete ? Status.EXHAUSTED : Status.INCONCLUSIVE; }</span>
+
     private void advance() {
-<span class="fc" id="L170">        meter.charge(Operation.MATCH, 1);</span>
-<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (pending.isEmpty()) {</span>
-<span class="fc bfc" id="L172" title="All 2 branches covered.">            status = complete ? Status.EXHAUSTED : Status.INCONCLUSIVE;</span>
-<span class="fc" id="L173">            return;</span>
+<span class="fc" id="L253">        meter.charge(Operation.MATCH, 1);</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        if (pending.isEmpty()) {</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            status = complete ? Status.EXHAUSTED : Status.INCONCLUSIVE;</span>
+<span class="fc" id="L256">            return;</span>
         }
-<span class="fc" id="L175">        occurrence = pending.pop();</span>
-<span class="fc" id="L176">        relevant = plan.relevant(occurrence.expression());</span>
-<span class="fc" id="L177">        schemaIndex = 0;</span>
-<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (plan.indexedDispatch()) {</span>
-<span class="fc" id="L179">            meter.charge(Operation.MATCH, plan.dispatchWork(relevant));</span>
-<span class="fc" id="L180">            remainingSchemas = plan.selectionMask(relevant, occurrence.expression());</span>
-<span class="fc" id="L181">            schemaIndex = Long.numberOfTrailingZeros(remainingSchemas);</span>
+<span class="fc" id="L258">        occurrence = pending.pop();</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (plan.selectsSites()) {</span>
+<span class="fc" id="L260">            advanceSelected();</span>
+<span class="fc" id="L261">            return;</span>
         }
-<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (relevant.size() &gt; plan.maximumSchemasPerOccurrence()) complete = false;</span>
-<span class="fc" id="L184">    }</span>
+<span class="fc" id="L263">        relevant = plan.relevant(occurrence.expression());</span>
+<span class="fc" id="L264">        schemaIndex = 0;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (plan.indexedDispatch()) {</span>
+<span class="fc" id="L266">            meter.charge(Operation.MATCH, plan.dispatchWork(relevant));</span>
+<span class="fc" id="L267">            remainingSchemas = plan.selectionMask(relevant, occurrence.expression());</span>
+<span class="fc" id="L268">            schemaIndex = Long.numberOfTrailingZeros(remainingSchemas);</span>
+        }
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if (relevant.size() &gt; plan.maximumSchemasPerOccurrence()) complete = false;</span>
+<span class="fc" id="L271">    }</span>
     private void match() {
-<span class="fc" id="L186">        meter.charge(Operation.MATCH, 1);</span>
-<span class="fc bfc" id="L187" title="All 4 branches covered.">        if (attempted &gt;= plan.bounds().maximumMatchAttempts() || produced &gt;= plan.bounds().maximumCandidates()) {</span>
-<span class="fc" id="L188">            complete = false; status = Status.INCONCLUSIVE;</span>
-<span class="fc" id="L189">            return;</span>
+<span class="fc" id="L273">        meter.charge(Operation.MATCH, 1);</span>
+<span class="fc bfc" id="L274" title="All 4 branches covered.">        if (attempted &gt;= plan.bounds().maximumMatchAttempts() || produced &gt;= plan.bounds().maximumCandidates()) {</span>
+<span class="fc" id="L275">            complete = false; status = Status.INCONCLUSIVE;</span>
+<span class="fc" id="L276">            return;</span>
         }
-<span class="fc" id="L191">        attempted++;</span>
-<span class="fc" id="L192">        var entry = relevant.get(schemaIndex++);</span>
-<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (plan.indexedDispatch()) {</span>
-<span class="fc" id="L194">            remainingSchemas &amp;= remainingSchemas - 1;</span>
-<span class="fc" id="L195">            schemaIndex = Long.numberOfTrailingZeros(remainingSchemas);</span>
+<span class="fc" id="L278">        attempted++;</span>
+<span class="fc" id="L279">        var entry = relevant.get(schemaIndex++);</span>
+<span class="fc bfc" id="L280" title="All 4 branches covered.">        if (plan.indexedDispatch() || plan.selectsSites()) {</span>
+<span class="fc" id="L281">            remainingSchemas &amp;= remainingSchemas - 1;</span>
+<span class="fc" id="L282">            schemaIndex = Long.numberOfTrailingZeros(remainingSchemas);</span>
         }
         // Existing exact matcher is bounded but atomic. A completed match is retained across pulls.
-<span class="fc" id="L198">        var outcome = entry.matcher().match(occurrence.expression(), new ExprMatcher.MatchOptions(</span>
-<span class="fc" id="L199">            null, 1, plan.bounds().maximumExpressionNodes() * 4, plan.bounds().maximumExpressionNodes() * 4));</span>
-<span class="fc" id="L200">        meter.charge(Operation.MATCH, (long) outcome.evaluatedSteps() + outcome.patternBranches());</span>
-<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (!outcome.complete()) complete = false;</span>
-<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (outcome.matched()) {</span>
-<span class="fc" id="L203">            matchedEntry = entry;</span>
-<span class="fc" id="L204">            bindings = outcome.matches().getFirst().bindings();</span>
+<span class="fc" id="L285">        var outcome = entry.matcher().match(occurrence.expression(), new ExprMatcher.MatchOptions(</span>
+<span class="fc" id="L286">            null, 1, plan.bounds().maximumExpressionNodes() * 4, plan.bounds().maximumExpressionNodes() * 4));</span>
+<span class="fc" id="L287">        meter.charge(Operation.MATCH, (long) outcome.evaluatedSteps() + outcome.patternBranches());</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (!outcome.complete()) complete = false;</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (outcome.matched()) {</span>
+<span class="fc" id="L290">            matchedEntry = entry;</span>
+<span class="fc" id="L291">            bindings = outcome.matches().getFirst().bindings();</span>
         }
-<span class="fc" id="L206">    }</span>
+<span class="fc" id="L293">    }</span>
     private void advanceApplication() {
-<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (application == null) {</span>
-<span class="fc" id="L209">            applicationWork = new Work();</span>
-<span class="fc" id="L210">            payment = meter.beginPrepaidApplication();</span>
-<span class="fc bfc" id="L211" title="All 2 branches covered.">            if (occurrence.path() instanceof SharedOccurrencePath shared) startSharedApplication(shared);</span>
-<span class="fc" id="L212">            else application = plan.startApplication(matchedEntry, source, encodedSource, occurrence.path(), bindings, applicationWork);</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">        if (application == null) {</span>
+<span class="fc" id="L296">            applicationWork = new Work();</span>
+<span class="fc" id="L297">            payment = meter.beginPrepaidApplication();</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            if (occurrence.path() instanceof SelectedPath selected) {</span>
+<span class="fc" id="L299">                startSelectedApplication(selected);</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            } else if (occurrence.path() instanceof SharedOccurrencePath shared) startSharedApplication(shared);</span>
+<span class="fc" id="L301">            else application = plan.startApplication(matchedEntry, source, encodedSource, occurrence.path(), bindings, applicationWork);</span>
         }
-<span class="fc" id="L214">        long before = applicationWork.units;</span>
-<span class="fc" id="L215">        var phase = application.phase();</span>
-<span class="fc" id="L216">        boolean failed = false;</span>
-<span class="fc" id="L217">        Throwable primary=null;</span>
+<span class="fc" id="L303">        long before = applicationWork.units;</span>
+<span class="fc" id="L304">        var phase = application.phase();</span>
+<span class="fc" id="L305">        boolean failed = false;</span>
+<span class="fc" id="L306">        Throwable primary=null;</span>
         try {
-<span class="fc" id="L219">            try { application.advance(); }</span>
-<span class="fc" id="L220">            catch(DomainRejected unsupported) { complete=false;failed=true; }</span>
-<span class="fc bfc" id="L221" title="All 2 branches covered.">            if(failed)meter.charge(Operation.MATCH,1);</span>
-<span class="fc" id="L222">        } catch(RuntimeException | Error failure) {</span>
-<span class="fc" id="L223">            primary=failure;throw failure;</span>
+<span class="fc" id="L308">            try { application.advance(); }</span>
+<span class="fc" id="L309">            catch(DomainRejected unsupported) { complete=false;failed=true; }</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            if(failed)meter.charge(Operation.MATCH,1);</span>
+<span class="fc" id="L311">        } catch(RuntimeException | Error failure) {</span>
+<span class="fc" id="L312">            primary=failure;throw failure;</span>
         } finally {
             // A real phase is charged once, including its failed visited prefix. Construction is not a phase.
-<span class="fc" id="L226">            try {meter.prepay(payment,phase,applicationWork.units-before);}</span>
-<span class="nc" id="L227">            catch(RuntimeException | Error paymentFailure) {</span>
-<span class="nc bnc" id="L228" title="All 2 branches missed.">                if(primary==null)throw paymentFailure;</span>
-<span class="nc bnc" id="L229" title="All 2 branches missed.">                if(paymentFailure!=primary)primary.addSuppressed(paymentFailure);</span>
-<span class="fc" id="L230">            }</span>
+<span class="fc" id="L315">            try {meter.prepay(payment,phase,applicationWork.units-before);}</span>
+<span class="nc" id="L316">            catch(RuntimeException | Error paymentFailure) {</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">                if(primary==null)throw paymentFailure;</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">                if(paymentFailure!=primary)primary.addSuppressed(paymentFailure);</span>
+<span class="fc" id="L319">            }</span>
         }
-<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (failed) meter.abandon(payment);</span>
-<span class="fc bfc" id="L233" title="All 2 branches covered.">        else if (application.done()) {</span>
-<span class="fc" id="L234">            ready = result.apply(application);</span>
-<span class="fc bfc" id="L235" title="All 2 branches covered.">            if (ready == null) meter.abandon(payment);</span>
-<span class="fc" id="L236">            else { meter.complete(payment, mathematics.apply(ready)); produced++; }</span>
-<span class="fc" id="L237">        } else return;</span>
-<span class="fc" id="L238">        de.regelsuche.retention.RetainedOperation.work(1);</span>
-<span class="fc" id="L239">        de.regelsuche.retention.RetainedOperation.checkpoint();</span>
-<span class="fc" id="L240">        clearApplication();</span>
-<span class="fc" id="L241">    }</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        if (failed) meter.abandon(payment);</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">        else if (application.done()) {</span>
+<span class="fc" id="L323">            ready = result.apply(application);</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">            if (ready == null) meter.abandon(payment);</span>
+<span class="fc" id="L325">            else { meter.complete(payment, mathematics.apply(ready)); rememberTarget(application, meter); produced++; }</span>
+<span class="fc" id="L326">        } else return;</span>
+<span class="fc" id="L327">        de.regelsuche.retention.RetainedOperation.work(1);</span>
+<span class="fc" id="L328">        de.regelsuche.retention.RetainedOperation.checkpoint();</span>
+<span class="fc" id="L329">        clearApplication();</span>
+<span class="fc" id="L330">    }</span>
+    private void startSelectedApplication(SelectedPath path) {
+<span class="pc bpc" id="L332" title="1 of 4 branches missed.">        if (path.size() &gt; 2 || RetainedOperation.isObserved()) {</span>
+<span class="fc" id="L333">            startSharedApplication(path);</span>
+<span class="fc" id="L334">            return;</span>
+        }
+        // The small immutable JDK lists store zero, one or two edges directly.
+<span class="fc bfc" id="L337" title="All 3 branches covered.">        List&lt;Integer&gt; edges = switch (path.size()) {</span>
+<span class="fc" id="L338">            case 0 -&gt; List.of();</span>
+<span class="fc" id="L339">            case 1 -&gt; List.of(path.get(0));</span>
+<span class="fc" id="L340">            default -&gt; List.of(path.get(0), path.get(1));</span>
+<span class="fc" id="L341">        };</span>
+<span class="fc" id="L342">        meter.charge(Operation.MATCH, path.size() + 1L);</span>
+<span class="fc" id="L343">        application = plan.startApplication(matchedEntry, source, encodedSource, edges, bindings, applicationWork);</span>
+<span class="fc" id="L344">    }</span>
+
     private static final class PathProjection implements RetainedGraph.View {
-        private final SharedOccurrencePath source;
+        private final List&lt;Integer&gt; source;
         private Integer[] buffer;
         private List&lt;Integer&gt; path;
-<span class="fc" id="L246">        PathProjection(SharedOccurrencePath source) { this.source = source; }</span>
+<span class="fc" id="L350">        PathProjection(List&lt;Integer&gt; source) { this.source = source; }</span>
         @Override public void retainedReferences(RetainedGraph.Visitor visitor) {
-<span class="nc" id="L248">            visitor.reference(source); visitor.reference(buffer); visitor.reference(path);</span>
-<span class="nc" id="L249">        }</span>
+<span class="nc" id="L352">            visitor.reference(source); visitor.reference(buffer); visitor.reference(path);</span>
+<span class="nc" id="L353">        }</span>
     }
-    private void startSharedApplication(SharedOccurrencePath path) {
-<span class="fc" id="L252">        var projection = new PathProjection(path);</span>
-<span class="fc" id="L253">        var held = RetainedOperation.retainCompleted(1, this, projection);</span>
-<span class="fc" id="L254">        Throwable primary = null;</span>
+    private void startSharedApplication(List&lt;Integer&gt; path) {
+<span class="fc" id="L356">        var projection = new PathProjection(path);</span>
+<span class="fc" id="L357">        var held = RetainedOperation.retainCompleted(1, this, projection);</span>
+<span class="fc" id="L358">        Throwable primary = null;</span>
         try {
-<span class="fc" id="L256">            projection.buffer = new Integer[path.size()];</span>
-<span class="fc" id="L257">            meter.charge(Operation.MATCH, path.size() + 1L);</span>
-<span class="fc" id="L258">            RetainedOperation.checkpoint();</span>
-<span class="fc" id="L259">            path.copyInto(projection.buffer);</span>
-<span class="fc" id="L260">            meter.charge(Operation.MATCH, path.size() + 1L);</span>
-<span class="fc" id="L261">            RetainedOperation.checkpoint();</span>
-<span class="fc" id="L262">            projection.path = List.of(projection.buffer);</span>
-<span class="fc" id="L263">            meter.charge(Operation.MATCH, path.size() + 1L);</span>
-<span class="fc" id="L264">            RetainedOperation.checkpoint();</span>
-<span class="fc" id="L265">            application = plan.startApplication(matchedEntry, source, encodedSource, projection.path, bindings, applicationWork);</span>
-<span class="fc" id="L266">            RetainedOperation.work(1);</span>
-<span class="fc" id="L267">            RetainedOperation.checkpoint();</span>
-<span class="nc" id="L268">        } catch (RuntimeException | Error failure) {</span>
-<span class="nc" id="L269">            primary = failure; observeFailure(failure); throw failure;</span>
-<span class="fc" id="L270">        } finally { closeFrame(held, primary); }</span>
-<span class="fc" id="L271">    }</span>
+<span class="fc" id="L360">            projection.buffer = new Integer[path.size()];</span>
+<span class="fc" id="L361">            meter.charge(Operation.MATCH, path.size() + 1L);</span>
+<span class="fc" id="L362">            RetainedOperation.checkpoint();</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">            if (path instanceof SharedOccurrencePath shared) shared.copyInto(projection.buffer);</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">            else for (int i = 0; i &lt; path.size(); i++) projection.buffer[i] = path.get(i);</span>
+<span class="fc" id="L365">            meter.charge(Operation.MATCH, path.size() + 1L);</span>
+<span class="fc" id="L366">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L367">            projection.path = List.of(projection.buffer);</span>
+<span class="fc" id="L368">            meter.charge(Operation.MATCH, path.size() + 1L);</span>
+<span class="fc" id="L369">            RetainedOperation.checkpoint();</span>
+<span class="fc" id="L370">            application = plan.startApplication(matchedEntry, source, encodedSource, projection.path, bindings, applicationWork);</span>
+<span class="fc" id="L371">            RetainedOperation.work(1);</span>
+<span class="fc" id="L372">            RetainedOperation.checkpoint();</span>
+<span class="nc" id="L373">        } catch (RuntimeException | Error failure) {</span>
+<span class="nc" id="L374">            primary = failure; observeFailure(failure); throw failure;</span>
+<span class="fc" id="L375">        } finally { closeFrame(held, primary); }</span>
+<span class="fc" id="L376">    }</span>
     private void clearApplication() {
-<span class="fc" id="L273">        application = null; applicationWork = null; payment = null;</span>
-<span class="fc" id="L274">        matchedEntry = null; bindings = null;</span>
-<span class="fc" id="L275">    }</span>
+<span class="fc" id="L378">        application = null; applicationWork = null; payment = null;</span>
+<span class="fc" id="L379">        matchedEntry = null; bindings = null;</span>
+<span class="fc" id="L380">    }</span>
     private Optional&lt;T&gt; emit() {
-<span class="fc" id="L277">        meter.charge(Operation.PULL, 1);</span>
-<span class="fc" id="L278">        T result = ready;</span>
-<span class="fc" id="L279">        ready = null;</span>
-<span class="fc" id="L280">        return Optional.of(result);</span>
+<span class="fc" id="L382">        meter.charge(Operation.PULL, 1);</span>
+<span class="fc" id="L383">        T result = ready;</span>
+<span class="fc" id="L384">        ready = null;</span>
+<span class="fc" id="L385">        return Optional.of(result);</span>
     }
     private void descend() {
-<span class="fc" id="L283">        meter.charge(Operation.MATCH, 1);</span>
-<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (occurrence.expression() instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L285">            pending.push(new Occurrence(binary.right(), child(occurrence.path(), 1)));</span>
-<span class="fc" id="L286">            pending.push(new Occurrence(binary.left(), child(occurrence.path(), 0)));</span>
-<span class="fc bfc" id="L287" title="All 2 branches covered.">            meter.charge(Operation.MATCH, occurrence.path() instanceof SharedOccurrencePath ? 2L : 2L * (occurrence.path().size() + 1));</span>
+<span class="fc" id="L388">        meter.charge(Operation.MATCH, 1);</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">        if (plan.selectsSites()) {</span>
+<span class="fc" id="L390">            var work = new Work();</span>
+<span class="fc" id="L391">            queueSelectedChildren(work);</span>
+<span class="fc" id="L392">            meter.charge(Operation.MATCH, work.units);</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">        } else if (occurrence.expression() instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L394">            pending.push(new Occurrence(binary.right(), child(occurrence.path(), 1)));</span>
+<span class="fc" id="L395">            pending.push(new Occurrence(binary.left(), child(occurrence.path(), 0)));</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            meter.charge(Operation.MATCH, occurrence.path() instanceof SharedOccurrencePath ? 2L : 2L * (occurrence.path().size() + 1));</span>
         }
-<span class="fc" id="L289">        occurrence = null; relevant = null;</span>
-<span class="fc" id="L290">    }</span>
+<span class="fc" id="L398">        occurrence = null; relevant = null;</span>
+<span class="fc" id="L399">    }</span>
     private static List&lt;Integer&gt; child(List&lt;Integer&gt; path, int index) {
-<span class="fc bfc" id="L292" title="All 2 branches covered.">        if (path instanceof SharedOccurrencePath shared) return shared.child(index);</span>
-<span class="fc" id="L293">        var result = new ArrayList&lt;&gt;(path);</span>
-<span class="fc" id="L294">        result.add(index);</span>
-<span class="fc" id="L295">        return List.copyOf(result);</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">        if (path instanceof SharedOccurrencePath shared) return shared.child(index);</span>
+<span class="fc" id="L402">        var result = new ArrayList&lt;&gt;(path);</span>
+<span class="fc" id="L403">        result.add(index);</span>
+<span class="fc" id="L404">        return List.copyOf(result);</span>
     }
-<span class="fc" id="L297">    @Override public Status status() { return status; }</span>
+<span class="fc" id="L406">    @Override public Status status() { return status; }</span>
     @Override public void close() {
-<span class="fc bfc" id="L299" title="All 2 branches covered.">        if(status==Status.CLOSED)return;</span>
-<span class="fc" id="L300">        try {RetainedOperation.work(pending.size()+11L);}</span>
-<span class="fc" id="L301">        catch(RuntimeException | Error failure) {observeFailure(failure);throw failure;}</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">        if(status==Status.CLOSED)return;</span>
+<span class="fc" id="L409">        try {RetainedOperation.work(pending.size()+11L);}</span>
+<span class="fc" id="L410">        catch(RuntimeException | Error failure) {observeFailure(failure);throw failure;}</span>
         finally {
-<span class="fc" id="L303">            pending.clear();occurrence=null;relevant=null;</span>
-<span class="fc" id="L304">            clearApplication();ready=null;source=null;initializationWork=null;</span>
-<span class="fc" id="L305">            status=Status.CLOSED;</span>
+<span class="fc" id="L412">            pending.clear();occurrence=null;relevant=null;</span>
+<span class="fc" id="L413">            clearApplication();ready=null;source=null;initializationWork=null;</span>
+<span class="fc" id="L414">            status=Status.CLOSED;</span>
         }
-<span class="fc" id="L307">    }</span>
+<span class="fc" id="L416">    }</span>
     private static void observeFailure(Throwable primary) {
-<span class="fc" id="L309">        try {RetainedOperation.checkpoint();}</span>
-<span class="pc bnc" id="L310" title="All 2 branches missed.">        catch(RuntimeException | Error observation){if(observation!=primary)primary.addSuppressed(observation);}</span>
-<span class="fc" id="L311">    }</span>
+<span class="fc" id="L418">        try {RetainedOperation.checkpoint();}</span>
+<span class="pc bnc" id="L419" title="All 2 branches missed.">        catch(RuntimeException | Error observation){if(observation!=primary)primary.addSuppressed(observation);}</span>
+<span class="fc" id="L420">    }</span>
     private static void closeFrame(RetainedOperation.Frame frame,Throwable primary) {
-<span class="fc bfc" id="L313" title="All 2 branches covered.">        try {if(frame!=null)frame.close();}</span>
-<span class="fc" id="L314">        catch(RuntimeException | Error cleanup) {</span>
-<span class="fc bfc" id="L315" title="All 2 branches covered.">            if(primary==null)throw cleanup;</span>
-<span class="fc bfc" id="L316" title="All 2 branches covered.">            if(cleanup!=primary)primary.addSuppressed(cleanup);</span>
-<span class="fc" id="L317">        }</span>
-<span class="fc" id="L318">    }</span>
+<span class="fc bfc" id="L422" title="All 2 branches covered.">        try {if(frame!=null)frame.close();}</span>
+<span class="fc" id="L423">        catch(RuntimeException | Error cleanup) {</span>
+<span class="fc bfc" id="L424" title="All 2 branches covered.">            if(primary==null)throw cleanup;</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">            if(cleanup!=primary)primary.addSuppressed(cleanup);</span>
+<span class="fc" id="L426">        }</span>
+<span class="fc" id="L427">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

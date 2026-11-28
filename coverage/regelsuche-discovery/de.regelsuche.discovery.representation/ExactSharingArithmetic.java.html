@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExactSharingArithmetic.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.representation</a> &gt; <span class="el_source">ExactSharingArithmetic.java</span></div><h1>ExactSharingArithmetic.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.representation;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scalar.ExactRational;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** A reusable exact four-operation program for one certified single-definition overlay. */
+public final class ExactSharingArithmetic {
+<span class="fc" id="L17">    public record Evaluation(ExactRational value, int arithmeticOperations, int referenceUses) { }</span>
+
+    private sealed interface Instruction { }
+<span class="fc" id="L20">    private record Literal(ExactRational value) implements Instruction { }</span>
+<span class="fc" id="L21">    private record Input(String name) implements Instruction { }</span>
+<span class="fc" id="L22">    private record Operation(BinaryOperator operator, int left, int right) implements Instruction { }</span>
+<span class="fc" id="L23">    private record Reference(int definition) implements Instruction { }</span>
+
+    private final List&lt;Instruction&gt; instructions;
+
+<span class="fc" id="L27">    private ExactSharingArithmetic(List&lt;Instruction&gt; instructions) {</span>
+<span class="fc" id="L28">        this.instructions = List.copyOf(instructions);</span>
+<span class="fc" id="L29">    }</span>
+
+    static ExactSharingArithmetic prepare(ExactSharingRepresentation overlay) {
+<span class="fc" id="L32">        var builder = new Builder(Set.copyOf(overlay.referencePaths()));</span>
+<span class="fc" id="L33">        builder.compile(new ExpressionParser().parseTerm(overlay.sourceExpression()), ExpressionOccurrencePath.root());</span>
+<span class="fc" id="L34">        return new ExactSharingArithmetic(builder.instructions);</span>
+    }
+
+    /** Counts actual arithmetic and every certified reference read, including the first. */
+    public Evaluation evaluate(Map&lt;String, ExactRational&gt; inputs) {
+<span class="fc" id="L39">        var registers = new ExactRational[instructions.size()];</span>
+<span class="fc" id="L40">        int arithmetic = 0;</span>
+<span class="fc" id="L41">        int references = 0;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (int index = 0; index &lt; instructions.size(); index++) {</span>
+<span class="fc bfc" id="L43" title="All 4 branches covered.">            registers[index] = switch (instructions.get(index)) {</span>
+<span class="fc" id="L44">                case Literal literal -&gt; literal.value();</span>
+<span class="fc" id="L45">                case Input input -&gt; {</span>
+<span class="fc" id="L46">                    var value = inputs.get(input.name());</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                    if (value == null) throw new IllegalArgumentException(&quot;Missing input: &quot; + input.name());</span>
+<span class="fc" id="L48">                    yield value;</span>
+                }
+<span class="fc" id="L50">                case Reference reference -&gt; {</span>
+<span class="fc" id="L51">                    references++;</span>
+<span class="fc" id="L52">                    yield registers[reference.definition()];</span>
+                }
+<span class="fc" id="L54">                case Operation op -&gt; {</span>
+<span class="fc" id="L55">                    var left = registers[op.left()];</span>
+<span class="fc" id="L56">                    var right = registers[op.right()];</span>
+<span class="fc" id="L57">                    arithmetic++;</span>
+<span class="pc bpc" id="L58" title="1 of 5 branches missed.">                    yield switch (op.operator()) {</span>
+<span class="fc" id="L59">                        case ADD -&gt; left.add(right);</span>
+<span class="fc" id="L60">                        case SUB -&gt; left.subtract(right);</span>
+<span class="fc" id="L61">                        case MUL -&gt; left.multiply(right);</span>
+<span class="fc" id="L62">                        case DIV -&gt; left.divide(right);</span>
+<span class="nc" id="L63">                        case POW -&gt; throw new IllegalStateException(&quot;Power cannot be prepared&quot;);</span>
+                    };
+                }
+<span class="fc" id="L66">            };</span>
+        }
+<span class="fc" id="L68">        return new Evaluation(registers[registers.length - 1], arithmetic, references);</span>
+    }
+
+    private static final class Builder {
+        final Set&lt;ExpressionOccurrencePath&gt; paths;
+<span class="fc" id="L73">        final List&lt;Instruction&gt; instructions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L74">        int definition = -1;</span>
+
+<span class="fc" id="L76">        Builder(Set&lt;ExpressionOccurrencePath&gt; paths) { this.paths = paths; }</span>
+
+        int compile(Expr expr, ExpressionOccurrencePath path) {
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (paths.contains(path)) {</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                if (definition &lt; 0) definition = emit(expr, path);</span>
+<span class="fc" id="L81">                return add(new Reference(definition));</span>
+            }
+<span class="fc" id="L83">            return emit(expr, path);</span>
+        }
+
+        private int emit(Expr expr, ExpressionOccurrencePath path) {
+<span class="fc bfc" id="L87" title="All 4 branches covered.">            return switch (expr) {</span>
+<span class="fc" id="L88">                case NumberExpr number -&gt; add(new Literal(number.value()));</span>
+<span class="fc" id="L89">                case VariableExpr variable -&gt; add(new Input(variable.name()));</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                case BinaryExpr binary when binary.operator() != BinaryOperator.POW -&gt; add(new Operation(</span>
+<span class="fc" id="L91">                    binary.operator(), compile(binary.left(), path.append(0)), compile(binary.right(), path.append(1))));</span>
+<span class="fc" id="L92">                default -&gt; throw new IllegalArgumentException(&quot;Exact sharing arithmetic supports only +, -, * and /&quot;);</span>
+            };
+        }
+
+        private int add(Instruction instruction) {
+<span class="fc" id="L97">            instructions.add(instruction);</span>
+<span class="fc" id="L98">            return instructions.size() - 1;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

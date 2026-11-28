@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/** Checks bounded native equality/ring proofs without invoking an external solver. */
+/** Checks bounded native equality and non-strict real-order proofs without an external solver. */
 public final class Z3EqualityProofReplay {
     static final int MAX_BYTES = 131_072;
     private Z3EqualityProofReplay() { }
@@ -31,10 +31,10 @@ public final class Z3EqualityProofReplay {
         try {
 <span class="fc" id="L32">            var checker = new Checker(obligation);</span>
 <span class="fc bfc" id="L33" title="All 2 branches covered.">            for (var premise : obligation.assumptions()) {</span>
-<span class="fc" id="L34">                checker.addAssertion(checker.equality(premise.relation(), premise.left(), premise.right()));</span>
+<span class="fc" id="L34">                checker.addAssertion(checker.relation(premise.relation(), premise.left(), premise.right()));</span>
 <span class="fc" id="L35">            }</span>
 <span class="fc" id="L36">            var goal = obligation.goal();</span>
-<span class="fc" id="L37">            checker.addAssertion(checker.values.negate(checker.equality(goal.relation(), goal.left(), goal.right())));</span>
+<span class="fc" id="L37">            checker.addAssertion(checker.values.negate(checker.relation(goal.relation(), goal.left(), goal.right())));</span>
 <span class="fc" id="L38">            return checker.check(Z3ProofSyntax.parse(object));</span>
 <span class="fc" id="L39">        } catch (Invalid | IllegalArgumentException | ArithmeticException unsupported) {</span>
 <span class="fc" id="L40">            return false;</span>
@@ -55,218 +55,223 @@ public final class Z3EqualityProofReplay {
 <span class="fc" id="L55">            rewrites = new Z3PolynomialProofRewrites(obligation, values);</span>
 <span class="fc" id="L56">        }</span>
 
-        Equality equality(Relation relation, de.regelsuche.solver.ir.SolverIr.Expression left,
-                          de.regelsuche.solver.ir.SolverIr.Expression right) {
-<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            if (relation != Relation.EQUALS) throw new Invalid();</span>
-<span class="fc" id="L61">            return values.equality(values.expression(left), values.expression(right));</span>
+        Formula relation(Relation relation, de.regelsuche.solver.ir.SolverIr.Expression left,
+                         de.regelsuche.solver.ir.SolverIr.Expression right) {
+<span class="fc" id="L60">            Real a = values.expression(left), b = values.expression(right);</span>
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">            return switch (relation) {</span>
+<span class="fc" id="L62">                case EQUALS -&gt; values.equality(a, b);</span>
+<span class="fc" id="L63">                case LESS_OR_EQUAL -&gt; values.order(a, b);</span>
+<span class="fc" id="L64">                case GREATER_OR_EQUAL -&gt; values.order(b, a);</span>
+<span class="nc" id="L65">                default -&gt; throw new Invalid();</span>
+            };
         }
 
         void addAssertion(Formula assertion) {
             // Native asserted leaves cannot recover distinct IDs for indistinguishable premises.
-<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            if (assertions.putIfAbsent(assertion, assertions.size()) != null) throw new Invalid();</span>
-<span class="fc" id="L67">        }</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            if (assertions.putIfAbsent(assertion, assertions.size()) != null) throw new Invalid();</span>
+<span class="fc" id="L72">        }</span>
 
         boolean check(Node root) {
-<span class="fc" id="L70">            var envelope = root.items(2);</span>
-<span class="fc" id="L71">            var logic = envelope.get(0).items(2);</span>
-<span class="pc bpc" id="L72" title="2 of 4 branches missed.">            if (!logic.get(0).is(&quot;set-logic&quot;) || !logic.get(1).is(&quot;ALL&quot;)) throw new Invalid();</span>
-<span class="fc" id="L73">            var proof = envelope.get(1).items(2);</span>
-<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if (!proof.get(0).is(&quot;proof&quot;)) throw new Invalid();</span>
-<span class="fc" id="L75">            Node body = proof.get(1);</span>
-<span class="fc bfc" id="L76" title="All 2 branches covered.">            while (body.head(&quot;let&quot;)) {</span>
-<span class="fc" id="L77">                var let = body.items(3);</span>
-<span class="fc" id="L78">                bindParallel(let.get(1));</span>
-<span class="fc" id="L79">                body = let.get(2);</span>
-<span class="fc" id="L80">            }</span>
-<span class="fc" id="L81">            Step result = step(body);</span>
-<span class="pc bpc" id="L82" title="1 of 4 branches missed.">            return result.conclusion() == Truth.FALSE &amp;&amp; result.dependencies().cardinality() == assertions.size();</span>
+<span class="fc" id="L75">            var envelope = root.items(2);</span>
+<span class="fc" id="L76">            var logic = envelope.get(0).items(2);</span>
+<span class="pc bpc" id="L77" title="2 of 4 branches missed.">            if (!logic.get(0).is(&quot;set-logic&quot;) || !logic.get(1).is(&quot;ALL&quot;)) throw new Invalid();</span>
+<span class="fc" id="L78">            var proof = envelope.get(1).items(2);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (!proof.get(0).is(&quot;proof&quot;)) throw new Invalid();</span>
+<span class="fc" id="L80">            Node body = proof.get(1);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            while (body.head(&quot;let&quot;)) {</span>
+<span class="fc" id="L82">                var let = body.items(3);</span>
+<span class="fc" id="L83">                bindParallel(let.get(1));</span>
+<span class="fc" id="L84">                body = let.get(2);</span>
+<span class="fc" id="L85">            }</span>
+<span class="fc" id="L86">            Step result = step(body);</span>
+<span class="pc bpc" id="L87" title="1 of 4 branches missed.">            return result.conclusion() == Truth.FALSE &amp;&amp; result.dependencies().cardinality() == assertions.size();</span>
         }
 
         private void bindParallel(Node node) {
-<span class="pc bpc" id="L86" title="2 of 4 branches missed.">            if (node.children() == null || node.children().isEmpty()) throw new Invalid();</span>
-<span class="fc" id="L87">            var names = new HashSet&lt;String&gt;();</span>
-<span class="fc" id="L88">            var pendingValues = new HashMap&lt;String, Value&gt;();</span>
-<span class="fc" id="L89">            var pendingSteps = new HashMap&lt;String, Step&gt;();</span>
-<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (Node binding : node.children()) {</span>
-<span class="fc" id="L91">                var pair = binding.items(2);</span>
-<span class="fc" id="L92">                String name = pair.get(0).atom();</span>
-<span class="pc bpc" id="L93" title="1 of 6 branches missed.">                if (!names.add(name) || values.bound(name) || steps.containsKey(name)) throw new Invalid();</span>
-<span class="fc bfc" id="L94" title="All 2 branches covered.">                if (name.matches(&quot;\\?x[0-9]+&quot;)) {</span>
-<span class="fc" id="L95">                    pendingValues.put(name, asReal(values.value(pair.get(1))));</span>
-<span class="fc bfc" id="L96" title="All 2 branches covered.">                } else if (name.matches(&quot;\\$x[0-9]+&quot;)) {</span>
-<span class="fc" id="L97">                    pendingValues.put(name, values.formula(pair.get(1)));</span>
-<span class="pc bpc" id="L98" title="1 of 2 branches missed.">                } else if (name.matches(&quot;@x[0-9]+&quot;)) {</span>
-<span class="fc" id="L99">                    pendingSteps.put(name, step(pair.get(1)));</span>
-<span class="nc" id="L100">                } else throw new Invalid();</span>
-<span class="fc" id="L101">            }</span>
+<span class="pc bpc" id="L91" title="2 of 4 branches missed.">            if (node.children() == null || node.children().isEmpty()) throw new Invalid();</span>
+<span class="fc" id="L92">            var names = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L93">            var pendingValues = new HashMap&lt;String, Value&gt;();</span>
+<span class="fc" id="L94">            var pendingSteps = new HashMap&lt;String, Step&gt;();</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            for (Node binding : node.children()) {</span>
+<span class="fc" id="L96">                var pair = binding.items(2);</span>
+<span class="fc" id="L97">                String name = pair.get(0).atom();</span>
+<span class="pc bpc" id="L98" title="1 of 6 branches missed.">                if (!names.add(name) || values.bound(name) || steps.containsKey(name)) throw new Invalid();</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                if (name.matches(&quot;\\?x[0-9]+&quot;)) {</span>
+<span class="fc" id="L100">                    pendingValues.put(name, asReal(values.value(pair.get(1))));</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                } else if (name.matches(&quot;\\$x[0-9]+&quot;)) {</span>
+<span class="fc" id="L102">                    pendingValues.put(name, values.formula(pair.get(1)));</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                } else if (name.matches(&quot;@x[0-9]+&quot;)) {</span>
+<span class="fc" id="L104">                    pendingSteps.put(name, step(pair.get(1)));</span>
+<span class="nc" id="L105">                } else throw new Invalid();</span>
+<span class="fc" id="L106">            }</span>
             // SMT lets are parallel: no RHS can observe a newly introduced sibling.
-<span class="fc" id="L103">            values.bindAll(pendingValues);</span>
-<span class="fc" id="L104">            steps.putAll(pendingSteps);</span>
-<span class="fc" id="L105">        }</span>
+<span class="fc" id="L108">            values.bindAll(pendingValues);</span>
+<span class="fc" id="L109">            steps.putAll(pendingSteps);</span>
+<span class="fc" id="L110">        }</span>
 
         private Step step(Node node) {
-<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (node.token() != null) {</span>
-<span class="fc" id="L109">                Step bound = steps.get(node.atom());</span>
-<span class="fc bfc" id="L110" title="All 2 branches covered.">                if (bound == null) throw new Invalid();</span>
-<span class="fc" id="L111">                return bound;</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (node.token() != null) {</span>
+<span class="fc" id="L114">                Step bound = steps.get(node.atom());</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                if (bound == null) throw new Invalid();</span>
+<span class="fc" id="L116">                return bound;</span>
             }
-<span class="fc bfc" id="L113" title="All 10 branches covered.">            return switch (node.first()) {</span>
-<span class="fc" id="L114">                case &quot;asserted&quot; -&gt; asserted(values.formula(node.items(2).get(1)));</span>
-<span class="fc" id="L115">                case &quot;refl&quot; -&gt; reflexivity(node.items(2));</span>
-<span class="fc" id="L116">                case &quot;symm&quot; -&gt; symmetry(node.items(3));</span>
-<span class="fc" id="L117">                case &quot;trans&quot;, &quot;trans*&quot; -&gt; transitivity(node);</span>
-<span class="fc" id="L118">                case &quot;monotonicity&quot; -&gt; congruence(node);</span>
-<span class="fc" id="L119">                case &quot;rewrite&quot; -&gt; rewrite(node.items(2));</span>
-<span class="fc" id="L120">                case &quot;mp&quot; -&gt; modusPonens(node.items(4));</span>
-<span class="fc" id="L121">                case &quot;unit-resolution&quot; -&gt; resolve(node);</span>
-<span class="fc" id="L122">                case &quot;not-or-elim&quot; -&gt; notOrElimination(node.items(3));</span>
-<span class="fc" id="L123">                default -&gt; throw new Invalid();</span>
+<span class="fc bfc" id="L118" title="All 10 branches covered.">            return switch (node.first()) {</span>
+<span class="fc" id="L119">                case &quot;asserted&quot; -&gt; asserted(values.formula(node.items(2).get(1)));</span>
+<span class="fc" id="L120">                case &quot;refl&quot; -&gt; reflexivity(node.items(2));</span>
+<span class="fc" id="L121">                case &quot;symm&quot; -&gt; symmetry(node.items(3));</span>
+<span class="fc" id="L122">                case &quot;trans&quot;, &quot;trans*&quot; -&gt; transitivity(node);</span>
+<span class="fc" id="L123">                case &quot;monotonicity&quot; -&gt; congruence(node);</span>
+<span class="fc" id="L124">                case &quot;rewrite&quot; -&gt; rewrite(node.items(2));</span>
+<span class="fc" id="L125">                case &quot;mp&quot; -&gt; modusPonens(node.items(4));</span>
+<span class="fc" id="L126">                case &quot;unit-resolution&quot; -&gt; resolve(node);</span>
+<span class="fc" id="L127">                case &quot;not-or-elim&quot; -&gt; notOrElimination(node.items(3));</span>
+<span class="fc" id="L128">                default -&gt; throw new Invalid();</span>
             };
         }
 
         private Step asserted(Formula value) {
-<span class="fc" id="L128">            Integer position = assertions.get(value);</span>
-<span class="fc bfc" id="L129" title="All 2 branches covered.">            if (position == null) throw new Invalid();</span>
-<span class="fc" id="L130">            var used = new BitSet();</span>
-<span class="fc" id="L131">            used.set(position);</span>
-<span class="fc" id="L132">            return new Step(value, used);</span>
+<span class="fc" id="L133">            Integer position = assertions.get(value);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (position == null) throw new Invalid();</span>
+<span class="fc" id="L135">            var used = new BitSet();</span>
+<span class="fc" id="L136">            used.set(position);</span>
+<span class="fc" id="L137">            return new Step(value, used);</span>
         }
 
         private Step reflexivity(List&lt;Node&gt; nodes) {
-<span class="fc" id="L136">            Equality equality = asEquality(values.formula(nodes.get(1)));</span>
-<span class="fc bfc" id="L137" title="All 2 branches covered.">            if (!equality.left().equals(equality.right())) throw new Invalid();</span>
-<span class="fc" id="L138">            return new Step(equality, new BitSet());</span>
+<span class="fc" id="L141">            Equality equality = asEquality(values.formula(nodes.get(1)));</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (!equality.left().equals(equality.right())) throw new Invalid();</span>
+<span class="fc" id="L143">            return new Step(equality, new BitSet());</span>
         }
 
         private Step symmetry(List&lt;Node&gt; nodes) {
-<span class="fc" id="L142">            Step source = step(nodes.get(1));</span>
-<span class="fc" id="L143">            Equality expected = asEquality(source.conclusion()).reverse();</span>
-<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (!expected.equals(values.formula(nodes.get(2)))) throw new Invalid();</span>
-<span class="fc" id="L145">            return new Step(expected, source.dependencies());</span>
+<span class="fc" id="L147">            Step source = step(nodes.get(1));</span>
+<span class="fc" id="L148">            Equality expected = asEquality(source.conclusion()).reverse();</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (!expected.equals(values.formula(nodes.get(2)))) throw new Invalid();</span>
+<span class="fc" id="L150">            return new Step(expected, source.dependencies());</span>
         }
 
         private Step transitivity(Node node) {
-<span class="fc" id="L149">            var chain = node.children();</span>
-<span class="pc bpc" id="L150" title="2 of 6 branches missed.">            if (chain.size() &lt; 4 || node.head(&quot;trans&quot;) &amp;&amp; chain.size() != 4) throw new Invalid();</span>
-<span class="fc" id="L151">            Step start = step(chain.get(1));</span>
-<span class="fc" id="L152">            Equality first = asEquality(start.conclusion());</span>
-<span class="fc" id="L153">            var used = (BitSet) start.dependencies().clone();</span>
-<span class="fc" id="L154">            Value end = first.right();</span>
-<span class="fc bfc" id="L155" title="All 2 branches covered.">            for (int i = 2; i &lt; chain.size() - 1; i++) {</span>
-<span class="fc" id="L156">                Step next = step(chain.get(i));</span>
-<span class="fc" id="L157">                Equality link = asEquality(next.conclusion());</span>
-<span class="fc bfc" id="L158" title="All 2 branches covered.">                if (!end.equals(link.left())) throw new Invalid();</span>
-<span class="fc" id="L159">                end = link.right();</span>
-<span class="fc" id="L160">                used.or(next.dependencies());</span>
+<span class="fc" id="L154">            var chain = node.children();</span>
+<span class="pc bpc" id="L155" title="2 of 6 branches missed.">            if (chain.size() &lt; 4 || node.head(&quot;trans&quot;) &amp;&amp; chain.size() != 4) throw new Invalid();</span>
+<span class="fc" id="L156">            Step start = step(chain.get(1));</span>
+<span class="fc" id="L157">            Equality first = asEquality(start.conclusion());</span>
+<span class="fc" id="L158">            var used = (BitSet) start.dependencies().clone();</span>
+<span class="fc" id="L159">            Value end = first.right();</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            for (int i = 2; i &lt; chain.size() - 1; i++) {</span>
+<span class="fc" id="L161">                Step next = step(chain.get(i));</span>
+<span class="fc" id="L162">                Equality link = asEquality(next.conclusion());</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                if (!end.equals(link.left())) throw new Invalid();</span>
+<span class="fc" id="L164">                end = link.right();</span>
+<span class="fc" id="L165">                used.or(next.dependencies());</span>
             }
-<span class="fc" id="L162">            Equality expected = values.equality(first.left(), end);</span>
-<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            if (!expected.equals(values.formula(chain.getLast()))) throw new Invalid();</span>
-<span class="fc" id="L164">            return new Step(expected, used);</span>
+<span class="fc" id="L167">            Equality expected = values.equality(first.left(), end);</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if (!expected.equals(values.formula(chain.getLast()))) throw new Invalid();</span>
+<span class="fc" id="L169">            return new Step(expected, used);</span>
         }
 
         private Step congruence(Node node) {
-<span class="fc" id="L168">            var parts = node.children();</span>
-<span class="pc bpc" id="L169" title="1 of 2 branches missed.">            if (parts.size() &lt; 2) throw new Invalid();</span>
-<span class="fc" id="L170">            Equality result = asEquality(values.formula(parts.getLast()));</span>
-<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (!sameOperator(result.left(), result.right())) throw new Invalid();</span>
-<span class="fc" id="L172">            var left = arguments(result.left());</span>
-<span class="fc" id="L173">            var right = arguments(result.right());</span>
-<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (left.size() != right.size()) throw new Invalid();</span>
-<span class="fc" id="L175">            var covered = new BitSet();</span>
-<span class="fc" id="L176">            var used = new BitSet();</span>
-<span class="fc bfc" id="L177" title="All 2 branches covered.">            for (int i = 1; i &lt; parts.size() - 1; i++) {</span>
-<span class="fc" id="L178">                Step premise = step(parts.get(i));</span>
-<span class="fc" id="L179">                Equality equality = asEquality(premise.conclusion());</span>
-<span class="fc" id="L180">                boolean relevant = false;</span>
-<span class="fc" id="L181">                boolean newChange = false;</span>
-<span class="fc bfc" id="L182" title="All 2 branches covered.">                for (int j = 0; j &lt; left.size(); j++) {</span>
-<span class="fc bfc" id="L183" title="All 4 branches covered.">                    if (equality.left().equals(left.get(j)) &amp;&amp; equality.right().equals(right.get(j))) {</span>
-<span class="fc bfc" id="L184" title="All 4 branches covered.">                        newChange |= !covered.get(j) &amp;&amp; !left.get(j).equals(right.get(j));</span>
-<span class="fc" id="L185">                        covered.set(j);</span>
-<span class="fc" id="L186">                        relevant = true;</span>
+<span class="fc" id="L173">            var parts = node.children();</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (parts.size() &lt; 2) throw new Invalid();</span>
+<span class="fc" id="L175">            Equality result = asEquality(values.formula(parts.getLast()));</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            if (!sameOperator(result.left(), result.right())) throw new Invalid();</span>
+<span class="fc" id="L177">            var left = arguments(result.left());</span>
+<span class="fc" id="L178">            var right = arguments(result.right());</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            if (left.size() != right.size()) throw new Invalid();</span>
+<span class="fc" id="L180">            var covered = new BitSet();</span>
+<span class="fc" id="L181">            var used = new BitSet();</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            for (int i = 1; i &lt; parts.size() - 1; i++) {</span>
+<span class="fc" id="L183">                Step premise = step(parts.get(i));</span>
+<span class="fc" id="L184">                Equality equality = asEquality(premise.conclusion());</span>
+<span class="fc" id="L185">                boolean relevant = false;</span>
+<span class="fc" id="L186">                boolean newChange = false;</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">                for (int j = 0; j &lt; left.size(); j++) {</span>
+<span class="fc bfc" id="L188" title="All 4 branches covered.">                    if (equality.left().equals(left.get(j)) &amp;&amp; equality.right().equals(right.get(j))) {</span>
+<span class="fc bfc" id="L189" title="All 4 branches covered.">                        newChange |= !covered.get(j) &amp;&amp; !left.get(j).equals(right.get(j));</span>
+<span class="fc" id="L190">                        covered.set(j);</span>
+<span class="fc" id="L191">                        relevant = true;</span>
                     }
                 }
-<span class="fc bfc" id="L189" title="All 6 branches covered.">                if (!relevant || !premise.dependencies().isEmpty() &amp;&amp; !newChange) throw new Invalid();</span>
-<span class="fc" id="L190">                used.or(premise.dependencies());</span>
+<span class="fc bfc" id="L194" title="All 6 branches covered.">                if (!relevant || !premise.dependencies().isEmpty() &amp;&amp; !newChange) throw new Invalid();</span>
+<span class="fc" id="L195">                used.or(premise.dependencies());</span>
             }
-<span class="fc bfc" id="L192" title="All 2 branches covered.">            for (int i = 0; i &lt; left.size(); i++) {</span>
-<span class="fc bfc" id="L193" title="All 4 branches covered.">                if (!left.get(i).equals(right.get(i)) &amp;&amp; !covered.get(i)) throw new Invalid();</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            for (int i = 0; i &lt; left.size(); i++) {</span>
+<span class="fc bfc" id="L198" title="All 4 branches covered.">                if (!left.get(i).equals(right.get(i)) &amp;&amp; !covered.get(i)) throw new Invalid();</span>
             }
-<span class="fc" id="L195">            return new Step(result, used);</span>
+<span class="fc" id="L200">            return new Step(result, used);</span>
         }
 
         private Step rewrite(List&lt;Node&gt; nodes) {
-<span class="fc" id="L199">            Equality result = asEquality(values.formula(nodes.get(1)));</span>
-<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (!rewrites.verifies(result)) throw new Invalid();</span>
-<span class="fc" id="L201">            return new Step(result, new BitSet());</span>
+<span class="fc" id="L204">            Equality result = asEquality(values.formula(nodes.get(1)));</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            if (!rewrites.verifies(result)) throw new Invalid();</span>
+<span class="fc" id="L206">            return new Step(result, new BitSet());</span>
         }
 
         private Step modusPonens(List&lt;Node&gt; nodes) {
-<span class="fc" id="L205">            Step premise = step(nodes.get(1)), bridge = step(nodes.get(2));</span>
-<span class="fc" id="L206">            Equality implication = asEquality(bridge.conclusion());</span>
-<span class="fc" id="L207">            Formula result = values.formula(nodes.get(3));</span>
-<span class="pc bpc" id="L208" title="1 of 4 branches missed.">            if (!implication.left().equals(premise.conclusion()) || !implication.right().equals(result)) throw new Invalid();</span>
-<span class="fc" id="L209">            return new Step(result, union(premise, bridge));</span>
+<span class="fc" id="L210">            Step premise = step(nodes.get(1)), bridge = step(nodes.get(2));</span>
+<span class="fc" id="L211">            Equality implication = asEquality(bridge.conclusion());</span>
+<span class="fc" id="L212">            Formula result = values.formula(nodes.get(3));</span>
+<span class="pc bpc" id="L213" title="1 of 4 branches missed.">            if (!implication.left().equals(premise.conclusion()) || !implication.right().equals(result)) throw new Invalid();</span>
+<span class="fc" id="L214">            return new Step(result, union(premise, bridge));</span>
         }
 
         /** A negated disjunction entails the negation of each of its actual operands. */
         private Step notOrElimination(List&lt;Node&gt; nodes) {
-<span class="fc" id="L214">            Step source = step(nodes.get(1));</span>
-<span class="fc" id="L215">            Formula result = values.formula(nodes.get(2));</span>
-<span class="pc bpc" id="L216" title="1 of 2 branches missed.">            if (!(source.conclusion() instanceof Negation negation)</span>
-<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                    || !(negation.operand() instanceof Disjunction disjunction)</span>
-<span class="fc bfc" id="L218" title="All 2 branches covered.">                    || disjunction.operands().stream().noneMatch(operand -&gt; complements(operand, result))) {</span>
-<span class="fc" id="L219">                throw new Invalid();</span>
+<span class="fc" id="L219">            Step source = step(nodes.get(1));</span>
+<span class="fc" id="L220">            Formula result = values.formula(nodes.get(2));</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">            if (!(source.conclusion() instanceof Negation negation)</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                    || !(negation.operand() instanceof Disjunction disjunction)</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">                    || disjunction.operands().stream().noneMatch(operand -&gt; complements(operand, result))) {</span>
+<span class="fc" id="L224">                throw new Invalid();</span>
             }
-<span class="fc" id="L221">            return new Step(result, source.dependencies());</span>
+<span class="fc" id="L226">            return new Step(result, source.dependencies());</span>
         }
 
         private Step resolve(Node node) {
-<span class="fc" id="L225">            var nodes = node.children();</span>
-<span class="pc bpc" id="L226" title="2 of 4 branches missed.">            if (nodes.size() &lt; 4 || nodes.size() &gt; 131) throw new Invalid();</span>
-<span class="fc" id="L227">            Step first = step(nodes.get(1));</span>
-<span class="fc" id="L228">            Formula result = values.formula(nodes.getLast());</span>
-<span class="fc" id="L229">            Step second = step(nodes.get(2));</span>
-<span class="fc bfc" id="L230" title="All 2 branches covered.">            if (nodes.size() == 4) {</span>
-<span class="fc bfc" id="L231" title="All 2 branches covered.">                if (complements(first.conclusion(), second.conclusion())) {</span>
-<span class="fc bfc" id="L232" title="All 2 branches covered.">                    if (result != Truth.FALSE) throw new Invalid();</span>
-<span class="fc" id="L233">                    return new Step(result, union(first, second));</span>
+<span class="fc" id="L230">            var nodes = node.children();</span>
+<span class="pc bpc" id="L231" title="2 of 4 branches missed.">            if (nodes.size() &lt; 4 || nodes.size() &gt; 131) throw new Invalid();</span>
+<span class="fc" id="L232">            Step first = step(nodes.get(1));</span>
+<span class="fc" id="L233">            Formula result = values.formula(nodes.getLast());</span>
+<span class="fc" id="L234">            Step second = step(nodes.get(2));</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            if (nodes.size() == 4) {</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">                if (complements(first.conclusion(), second.conclusion())) {</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">                    if (result != Truth.FALSE) throw new Invalid();</span>
+<span class="fc" id="L238">                    return new Step(result, union(first, second));</span>
                 }
             }
-<span class="pc bpc" id="L236" title="1 of 2 branches missed.">            if (!(first.conclusion() instanceof Disjunction clause)) throw new Invalid();</span>
-<span class="fc" id="L237">            var remaining = new ArrayList&lt;&gt;(clause.operands());</span>
-<span class="fc" id="L238">            var used = (BitSet) first.dependencies().clone();</span>
-<span class="fc bfc" id="L239" title="All 2 branches covered.">            for (int i = 2; i &lt; nodes.size() - 1; i++) {</span>
-<span class="fc bfc" id="L240" title="All 2 branches covered.">                Step unit = i == 2 ? second : step(nodes.get(i));</span>
-<span class="fc" id="L241">                int matched = -1;</span>
-<span class="fc bfc" id="L242" title="All 2 branches covered.">                for (int j = 0; j &lt; remaining.size(); j++) {</span>
-<span class="fc bfc" id="L243" title="All 2 branches covered.">                    if (complements(remaining.get(j), unit.conclusion())) {</span>
-<span class="fc" id="L244">                        matched = j;</span>
-<span class="fc" id="L245">                        break;</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            if (!(first.conclusion() instanceof Disjunction clause)) throw new Invalid();</span>
+<span class="fc" id="L242">            var remaining = new ArrayList&lt;&gt;(clause.operands());</span>
+<span class="fc" id="L243">            var used = (BitSet) first.dependencies().clone();</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            for (int i = 2; i &lt; nodes.size() - 1; i++) {</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">                Step unit = i == 2 ? second : step(nodes.get(i));</span>
+<span class="fc" id="L246">                int matched = -1;</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">                for (int j = 0; j &lt; remaining.size(); j++) {</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">                    if (complements(remaining.get(j), unit.conclusion())) {</span>
+<span class="fc" id="L249">                        matched = j;</span>
+<span class="fc" id="L250">                        break;</span>
                     }
                 }
-<span class="fc bfc" id="L248" title="All 2 branches covered.">                if (matched &lt; 0) throw new Invalid();</span>
-<span class="fc" id="L249">                remaining.remove(matched);</span>
-<span class="fc" id="L250">                used.or(unit.dependencies());</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">                if (matched &lt; 0) throw new Invalid();</span>
+<span class="fc" id="L254">                remaining.remove(matched);</span>
+<span class="fc" id="L255">                used.or(unit.dependencies());</span>
             }
-<span class="pc bpc" id="L252" title="1 of 3 branches missed.">            boolean exact = switch (remaining.size()) {</span>
-<span class="pc bpc" id="L253" title="1 of 2 branches missed.">                case 0 -&gt; result == Truth.FALSE;</span>
-<span class="fc" id="L254">                case 1 -&gt; result.equals(remaining.getFirst());</span>
-<span class="nc bnc" id="L255" title="All 4 branches missed.">                default -&gt; result instanceof Disjunction rest &amp;&amp; rest.operands().equals(remaining);</span>
-<span class="fc" id="L256">            };</span>
-<span class="fc bfc" id="L257" title="All 2 branches covered.">            if (!exact) throw new Invalid();</span>
-<span class="fc" id="L258">            return new Step(result, used);</span>
+<span class="pc bpc" id="L257" title="1 of 3 branches missed.">            boolean exact = switch (remaining.size()) {</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">                case 0 -&gt; result == Truth.FALSE;</span>
+<span class="fc" id="L259">                case 1 -&gt; result.equals(remaining.getFirst());</span>
+<span class="nc bnc" id="L260" title="All 4 branches missed.">                default -&gt; result instanceof Disjunction rest &amp;&amp; rest.operands().equals(remaining);</span>
+<span class="fc" id="L261">            };</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">            if (!exact) throw new Invalid();</span>
+<span class="fc" id="L263">            return new Step(result, used);</span>
         }
 
         private static BitSet union(Step first, Step second) {
-<span class="fc" id="L262">            var result = (BitSet) first.dependencies().clone();</span>
-<span class="fc" id="L263">            result.or(second.dependencies());</span>
-<span class="fc" id="L264">            return result;</span>
+<span class="fc" id="L267">            var result = (BitSet) first.dependencies().clone();</span>
+<span class="fc" id="L268">            result.or(second.dependencies());</span>
+<span class="fc" id="L269">            return result;</span>
         }
 
         private static Equality asEquality(Formula formula) {
-<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            if (!(formula instanceof Equality equality)) throw new Invalid();</span>
-<span class="fc" id="L269">            return equality;</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">            if (!(formula instanceof Equality equality)) throw new Invalid();</span>
+<span class="fc" id="L274">            return equality;</span>
         }
     }
 }

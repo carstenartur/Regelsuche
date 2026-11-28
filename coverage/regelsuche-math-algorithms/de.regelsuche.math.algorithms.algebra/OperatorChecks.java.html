@@ -65,79 +65,83 @@ final class OperatorChecks {
 
     void reserve(int rows, int cols) {
 <span class="fc" id="L67">        dimensions(rows, cols);</span>
-<span class="fc" id="L68">        materialized += (long) rows * cols;</span>
-<span class="fc" id="L69">        work.cells(materialized);</span>
-<span class="fc" id="L70">    }</span>
+<span class="fc" id="L68">        reserveCells((long) rows * cols);</span>
+<span class="fc" id="L69">    }</span>
+
+    void reserveCells(long cells) {
+<span class="fc" id="L72">        materialized += cells;</span>
+<span class="fc" id="L73">        work.cells(materialized);</span>
+<span class="fc" id="L74">    }</span>
 
     void input(PolynomialMatrix matrix) {
-<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        need(matrix != null, &quot;MISSING_MATRIX&quot;);</span>
-<span class="fc" id="L74">        dimensions(matrix.rows(), matrix.columns());</span>
-<span class="fc" id="L75">        work.cells((long) matrix.rows() * matrix.columns());</span>
-<span class="fc bfc" id="L76" title="All 4 branches covered.">        for (var row : matrix.entries()) for (var entry : row) {</span>
-<span class="fc" id="L77">            work.charge(1);</span>
-<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (entry.isZero()) continue;</span>
-<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (entry.termCount() != 1)</span>
-<span class="nc" id="L80">                throw new Rejected(Status.UNSUPPORTED, &quot;NON_RATIONAL_MATRIX&quot;);</span>
-<span class="fc" id="L81">            var term = entry.terms().entrySet().iterator().next();</span>
-<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (!term.getKey().powers().isEmpty())</span>
-<span class="fc" id="L83">                throw new Rejected(Status.UNSUPPORTED, &quot;NON_RATIONAL_MATRIX&quot;);</span>
-<span class="fc" id="L84">            var value = term.getValue();</span>
-<span class="fc" id="L85">            int bits = Math.max(value.numerator().bitLength(), value.denominator().bitLength());</span>
-<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (bits &gt; ExactMatrixAlgebra.MAX_COEFFICIENT_BITS)</span>
-<span class="nc" id="L87">                throw new Rejected(Status.STOPPED, &quot;COEFFICIENT_SIZE_LIMIT&quot;);</span>
-<span class="fc" id="L88">            work.charge(1L + bits / Long.SIZE);</span>
-<span class="fc" id="L89">        }</span>
-<span class="fc" id="L90">    }</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        need(matrix != null, &quot;MISSING_MATRIX&quot;);</span>
+<span class="fc" id="L78">        dimensions(matrix.rows(), matrix.columns());</span>
+<span class="fc" id="L79">        work.cells((long) matrix.rows() * matrix.columns());</span>
+<span class="fc bfc" id="L80" title="All 4 branches covered.">        for (var row : matrix.entries()) for (var entry : row) {</span>
+<span class="fc" id="L81">            work.charge(1);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (entry.isZero()) continue;</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (entry.termCount() != 1)</span>
+<span class="nc" id="L84">                throw new Rejected(Status.UNSUPPORTED, &quot;NON_RATIONAL_MATRIX&quot;);</span>
+<span class="fc" id="L85">            var term = entry.terms().entrySet().iterator().next();</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (!term.getKey().powers().isEmpty())</span>
+<span class="fc" id="L87">                throw new Rejected(Status.UNSUPPORTED, &quot;NON_RATIONAL_MATRIX&quot;);</span>
+<span class="fc" id="L88">            var value = term.getValue();</span>
+<span class="fc" id="L89">            int bits = Math.max(value.numerator().bitLength(), value.denominator().bitLength());</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            if (bits &gt; ExactMatrixAlgebra.MAX_COEFFICIENT_BITS)</span>
+<span class="nc" id="L91">                throw new Rejected(Status.STOPPED, &quot;COEFFICIENT_SIZE_LIMIT&quot;);</span>
+<span class="fc" id="L92">            work.charge(1L + bits / Long.SIZE);</span>
+<span class="fc" id="L93">        }</span>
+<span class="fc" id="L94">    }</span>
 
     PolynomialMatrix matrix(int rows, int cols, BiFunction&lt;Integer, Integer, Polynomial&gt; entries) {
-<span class="fc" id="L93">        reserve(rows, cols);</span>
-<span class="fc" id="L94">        return algebra.matrix(rows, cols, entries);</span>
+<span class="fc" id="L97">        reserve(rows, cols);</span>
+<span class="fc" id="L98">        return algebra.matrix(rows, cols, entries);</span>
     }
 
     PolynomialMatrix unit(int n) {
-<span class="fc" id="L98">        reserve(n, n);</span>
-<span class="fc" id="L99">        return algebra.identity(n);</span>
+<span class="fc" id="L102">        reserve(n, n);</span>
+<span class="fc" id="L103">        return algebra.identity(n);</span>
     }
 
     PolynomialMatrix times(PolynomialMatrix left, PolynomialMatrix right) {
-<span class="fc" id="L103">        reserve(left.rows(), right.columns());</span>
-<span class="fc" id="L104">        return algebra.multiply(left, right);</span>
+<span class="fc" id="L107">        reserve(left.rows(), right.columns());</span>
+<span class="fc" id="L108">        return algebra.multiply(left, right);</span>
     }
 
     PolynomialMatrix plus(PolynomialMatrix left, PolynomialMatrix right) {
-<span class="fc" id="L108">        reserve(left.rows(), left.columns());</span>
-<span class="fc" id="L109">        return algebra.add(left, right);</span>
+<span class="fc" id="L112">        reserve(left.rows(), left.columns());</span>
+<span class="fc" id="L113">        return algebra.add(left, right);</span>
     }
 
-<span class="fc" id="L112">    record Shape(int rows, int columns, Cost cost) {}</span>
+<span class="fc" id="L116">    record Shape(int rows, int columns, Cost cost) {}</span>
 
     /** Inspect before expansion. Charge each staged matvec occurrence, including shared subexpressions. */
     Shape inspect(ExactMatrixExpression expression, int depth) {
-<span class="fc" id="L116">        work.charge(1);</span>
-<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        need(expression != null, &quot;MISSING_OPERATOR&quot;);</span>
-<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (depth &gt; ExactMatrixAlgebra.MAX_DEPTH) throw new Rejected(Status.STOPPED, &quot;EXPRESSION_DEPTH_LIMIT&quot;);</span>
-<span class="pc bpc" id="L119" title="1 of 5 branches missed.">        Shape result = switch (expression) {</span>
-<span class="fc" id="L120">            case ExactMatrixExpression.Identity i -&gt; new Shape(i.dimension(), i.dimension(), new Cost(0, 0));</span>
-<span class="fc" id="L121">            case ExactMatrixExpression.Matrix m -&gt; {</span>
-<span class="fc" id="L122">                input(m.value());</span>
-<span class="fc" id="L123">                yield new Shape(m.value().rows(), m.value().columns(), Cost.dense(m.value()));</span>
+<span class="fc" id="L120">        work.charge(1);</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        need(expression != null, &quot;MISSING_OPERATOR&quot;);</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (depth &gt; ExactMatrixAlgebra.MAX_DEPTH) throw new Rejected(Status.STOPPED, &quot;EXPRESSION_DEPTH_LIMIT&quot;);</span>
+<span class="pc bpc" id="L123" title="1 of 5 branches missed.">        Shape result = switch (expression) {</span>
+<span class="fc" id="L124">            case ExactMatrixExpression.Identity i -&gt; new Shape(i.dimension(), i.dimension(), new Cost(0, 0));</span>
+<span class="fc" id="L125">            case ExactMatrixExpression.Matrix m -&gt; {</span>
+<span class="fc" id="L126">                input(m.value());</span>
+<span class="fc" id="L127">                yield new Shape(m.value().rows(), m.value().columns(), Cost.dense(m.value()));</span>
             }
-<span class="fc" id="L125">            case ExactMatrixExpression.Product p -&gt; {</span>
-<span class="fc" id="L126">                var left = inspect(p.left(), depth + 1);</span>
-<span class="fc" id="L127">                var right = inspect(p.right(), depth + 1);</span>
-<span class="fc bfc" id="L128" title="All 2 branches covered.">                need(left.columns == right.rows, &quot;PRODUCT_DIMENSION_MISMATCH&quot;);</span>
-<span class="fc" id="L129">                yield new Shape(left.rows, right.columns, left.cost.plus(right.cost));</span>
+<span class="fc" id="L129">            case ExactMatrixExpression.Product p -&gt; {</span>
+<span class="fc" id="L130">                var left = inspect(p.left(), depth + 1);</span>
+<span class="fc" id="L131">                var right = inspect(p.right(), depth + 1);</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                need(left.columns == right.rows, &quot;PRODUCT_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L133">                yield new Shape(left.rows, right.columns, left.cost.plus(right.cost));</span>
             }
-<span class="fc" id="L131">            case ExactMatrixExpression.Sum s -&gt; {</span>
-<span class="fc" id="L132">                var left = inspect(s.left(), depth + 1);</span>
-<span class="fc" id="L133">                var right = inspect(s.right(), depth + 1);</span>
-<span class="pc bpc" id="L134" title="2 of 4 branches missed.">                need(left.rows == right.rows &amp;&amp; left.columns == right.columns, &quot;SUM_DIMENSION_MISMATCH&quot;);</span>
-<span class="fc" id="L135">                yield new Shape(left.rows, left.columns, left.cost.plus(right.cost).updates(left.rows));</span>
+<span class="fc" id="L135">            case ExactMatrixExpression.Sum s -&gt; {</span>
+<span class="fc" id="L136">                var left = inspect(s.left(), depth + 1);</span>
+<span class="fc" id="L137">                var right = inspect(s.right(), depth + 1);</span>
+<span class="pc bpc" id="L138" title="2 of 4 branches missed.">                need(left.rows == right.rows &amp;&amp; left.columns == right.columns, &quot;SUM_DIMENSION_MISMATCH&quot;);</span>
+<span class="fc" id="L139">                yield new Shape(left.rows, left.columns, left.cost.plus(right.cost).updates(left.rows));</span>
             }
-<span class="nc" id="L137">            default -&gt; throw new Rejected(Status.UNSUPPORTED, &quot;UNSUPPORTED_OPERATOR_SYNTAX&quot;);</span>
-<span class="fc" id="L138">        };</span>
-<span class="fc" id="L139">        reserve(result.rows, result.columns);</span>
-<span class="fc" id="L140">        return result;</span>
+<span class="nc" id="L141">            default -&gt; throw new Rejected(Status.UNSUPPORTED, &quot;UNSUPPORTED_OPERATOR_SYNTAX&quot;);</span>
+<span class="fc" id="L142">        };</span>
+<span class="fc" id="L143">        reserve(result.rows, result.columns);</span>
+<span class="fc" id="L144">        return result;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

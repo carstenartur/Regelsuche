@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BinaryByteFieldTable.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">BinaryByteFieldTable.java</span></div><h1>BinaryByteFieldTable.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import java.util.Optional;
+
+/** Checks multiplication tables in the polynomial basis 1, x, ..., x^7 over GF(2). */
+public final class BinaryByteFieldTable {
+    private static final int ORDER = 256;
+    private BinaryByteFieldTable() {}
+
+    /**
+     * Evidence about the values inspected during verification. Ownership or future stability
+     * of a caller's table is a separate obligation whenever that table can be mutated.
+     */
+    public static final class Verified {
+        private final int modulus;
+<span class="nc" id="L16">        private Verified(int modulus) { this.modulus = modulus; }</span>
+        /** Monic degree-eight polynomial, including the bit for x^8. */
+<span class="nc" id="L18">        public int modulus() { return modulus; }</span>
+<span class="nc" id="L19">        public int productsChecked() { return ORDER * ORDER; }</span>
+    }
+
+    /**
+     * Observing x^7 times x gives the low eight coefficients of the modulus. Prove that
+     * modulus irreducible and independently reconstruct every cell by polynomial arithmetic.
+     */
+    public static Optional&lt;Verified&gt; verify(byte[][] table) {
+<span class="nc bnc" id="L27" title="All 4 branches missed.">        if (table == null || table.length != ORDER) return Optional.empty();</span>
+        // Copy row references once. Each mutable row is copied before examining its values.
+<span class="nc" id="L29">        var snapshot = table.clone();</span>
+<span class="nc bnc" id="L30" title="All 2 branches missed.">        for (int i = 0; i &lt; ORDER; i++) {</span>
+<span class="nc" id="L31">            byte[] row = snapshot[i];</span>
+<span class="nc bnc" id="L32" title="All 4 branches missed.">            if (row == null || row.length != ORDER) return Optional.empty();</span>
+<span class="nc" id="L33">            snapshot[i] = row.clone();</span>
+        }
+<span class="nc" id="L35">        int modulus = ORDER | Byte.toUnsignedInt(snapshot[128][2]);</span>
+        // Every reducible degree-eight polynomial has a monic factor of degree at most four.
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        for (int divisor = 2; divisor &lt; 32; divisor++) {</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">            if (remainder(modulus, divisor) == 0) return Optional.empty();</span>
+        }
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        for (int coefficient = 0; coefficient &lt; ORDER; coefficient++) {</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">            for (int input = 0; input &lt; ORDER; input++) {</span>
+<span class="nc" id="L42">                int product = 0;</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">                for (int bits = input; bits != 0; bits &amp;= bits - 1) {</span>
+<span class="nc" id="L44">                    product ^= coefficient &lt;&lt; Integer.numberOfTrailingZeros(bits);</span>
+                }
+<span class="nc bnc" id="L46" title="All 2 branches missed.">                if (Byte.toUnsignedInt(snapshot[coefficient][input]) != remainder(product, modulus)) {</span>
+<span class="nc" id="L47">                    return Optional.empty();</span>
+                }
+            }
+        }
+<span class="nc" id="L51">        return Optional.of(new Verified(modulus));</span>
+    }
+
+    private static int remainder(int dividend, int divisor) {
+<span class="nc" id="L55">        int degree = Integer.highestOneBit(divisor);</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        for (int bit = Integer.highestOneBit(dividend); bit &gt;= degree; bit &gt;&gt;&gt;= 1) {</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">            if ((dividend &amp; bit) != 0) dividend ^= divisor * (bit / degree);</span>
+        }
+<span class="nc" id="L59">        return dividend;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>

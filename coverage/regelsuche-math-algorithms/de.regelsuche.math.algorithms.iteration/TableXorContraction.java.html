@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TableXorContraction.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Regelsuche Coverage</a> &gt; <a href="../index.html" class="el_bundle">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.iteration</a> &gt; <span class="el_source">TableXorContraction.java</span></div><h1>TableXorContraction.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.iteration;
+
+import de.regelsuche.ast.iteration.TableXorReduction;
+import java.util.Objects;
+
+/** Exact reference semantics of a byte table contraction on stable input arrays. */
+public final class TableXorContraction {
+    private TableXorContraction() {}
+
+    /**
+     * Computes fresh output rows. Column zero of each result corresponds to the source
+     * offset. Input count zero is defined for reductions with an explicit zero initializer.
+     */
+    public static byte[][] evaluate(TableXorReduction reduction, byte[][] table,
+                                    byte[][] coefficients, byte[][] inputs,
+                                    int inputCount, int outputCount, int offset, int byteCount) {
+<span class="nc" id="L17">        Objects.requireNonNull(reduction, &quot;reduction&quot;);</span>
+<span class="nc bnc" id="L18" title="All 14 branches missed.">        if (inputCount &lt; 0 || inputCount &gt; inputs.length</span>
+                || outputCount &lt; 0 || outputCount &gt; coefficients.length
+                || offset &lt; 0 || byteCount &lt; 0 || byteCount &gt; Integer.MAX_VALUE - offset) {
+<span class="nc" id="L21">            throw new IllegalArgumentException(&quot;invalid contraction dimensions&quot;);</span>
+        }
+<span class="nc bnc" id="L23" title="All 4 branches missed.">        if (inputCount == 0 &amp;&amp; reduction.storage() == TableXorReduction.Storage.FIRST_STORE_THEN_XOR) {</span>
+<span class="nc" id="L24">            throw new IllegalArgumentException(&quot;first-input initialization requires an input&quot;);</span>
+        }
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        if (table.length != 256) throw new IllegalArgumentException(&quot;expected 256 table rows&quot;);</span>
+<span class="nc bnc" id="L27" title="All 2 branches missed.">        for (byte[] row : table) {</span>
+<span class="nc bnc" id="L28" title="All 4 branches missed.">            if (row == null || row.length != 256) throw new IllegalArgumentException(&quot;expected 256 columns&quot;);</span>
+        }
+<span class="nc bnc" id="L30" title="All 2 branches missed.">        for (int input = 0; input &lt; inputCount; input++) {</span>
+<span class="nc bnc" id="L31" title="All 4 branches missed.">            if (inputs[input] == null || inputs[input].length &lt; offset + byteCount) {</span>
+<span class="nc" id="L32">                throw new IllegalArgumentException(&quot;input row shorter than requested window&quot;);</span>
+            }
+        }
+<span class="nc bnc" id="L35" title="All 2 branches missed.">        for (int output = 0; output &lt; outputCount; output++) {</span>
+<span class="nc bnc" id="L36" title="All 4 branches missed.">            if (coefficients[output] == null || coefficients[output].length &lt; inputCount) {</span>
+<span class="nc" id="L37">                throw new IllegalArgumentException(&quot;coefficient row shorter than requested input count&quot;);</span>
+            }
+        }
+<span class="nc" id="L40">        var result = new byte[outputCount][byteCount];</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        for (int output = 0; output &lt; outputCount; output++) {</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">            for (int position = 0; position &lt; byteCount; position++) {</span>
+<span class="nc" id="L43">                byte sum = 0;</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">                for (int input = 0; input &lt; inputCount; input++) {</span>
+<span class="nc" id="L45">                    int coefficient = Byte.toUnsignedInt(coefficients[output][input]);</span>
+<span class="nc" id="L46">                    int value = Byte.toUnsignedInt(inputs[input][offset + position]);</span>
+<span class="nc" id="L47">                    sum ^= table[coefficient][value];</span>
+                }
+<span class="nc" id="L49">                result[output][position] = sum;</span>
+            }
+        }
+<span class="nc" id="L52">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.16.202610240946</span></div></body></html>
