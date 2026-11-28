@@ -17,6 +17,7 @@ import de.regelsuche.search.moves.NativeMoveProvider;
 import de.regelsuche.search.moves.NativeSearchMove;
 import de.regelsuche.search.moves.SearchMove;
 import de.regelsuche.search.moves.TypedMoveSearch;
+import de.regelsuche.search.moves.TypedSourceOnlySearch;
 import de.regelsuche.transform.Transformation;
 import java.util.List;
 import java.util.Map;
@@ -204,6 +205,43 @@ class CheckedSchemaSelectionDifferentialTest {
                     budget.maxStates(), limit, budget.maxComplexityDebt())));
             assertEquals(limit == total, bounded.solved(), "work budget " + limit);
             if (limit == total - 1) assertTrue(bounded.evidence().totalWork() > limit);
+        }
+    }
+
+    @Test void sharedNodeGoalRetainsTheProofAndItsIndependentReplayAtTheBudgetBoundary() {
+        var query = task("(((r+s)/7)+0)*1", 5);
+        var previous = inventory.newTaskSolverWithRegeneratedWitness(model);
+        var shared = inventory.newTaskSolverWithDomainReceipts(model);
+        assertNotEquals(previous.preparationReceipt(), shared.preparationReceipt());
+        var control = previous.solve(query);
+        var actual = shared.solve(query);
+        assertTrue(control.solved() && actual.solved());
+        assertTrue(actual.learnedApplications() > 0);
+        assertEquals(control.evidence().witness(), actual.evidence().witness());
+        assertEquals(control.evidence().inputScore(), actual.evidence().inputScore());
+        assertEquals(control.evidence().outputScore(), actual.evidence().outputScore());
+        assertEquals(control.evidence().replayWork(), actual.evidence().replayWork());
+        assertTrue(actual.evidence().queryWork() < control.evidence().queryWork());
+
+        // Scoring an unrelated expression can only reuse a count in the same problem.
+        var first = shared.scopedTask(query);
+        var second = shared.scopedTask(query);
+        var unrelated = new TypedMoveSearch.State(parse("a*b+3"), 1, 1, "", List.of(), Set.of(), 0);
+        first.problem().stateValue().evaluate(unrelated, CONTEXT);
+        assertEquals(1, first.objective().evaluate(unrelated).work());
+        assertEquals(6, second.objective().evaluate(unrelated).work());
+
+        TypedSourceOnlySearch.Objective custom = ignored -> new TypedSourceOnlySearch.Score(7, 12);
+        var customTask = new CheckedSchemaTaskSolver.Task(query.source(), List.of(),
+            new CheckedSchemaTaskSolver.Goal(custom, 7), query.budget());
+        assertSame(custom, shared.scopedTask(customTask).objective());
+        var budget = query.budget();
+        long total = actual.evidence().totalWork();
+        for (long limit : List.of(total - 1, total)) {
+            var bounded = shared.solve(new CheckedSchemaTaskSolver.Task(query.source(), query.assumptions(), query.goal(),
+                new MoveSearch.Budget(budget.maxPrimitiveSteps(), budget.maxSearchDepth(), budget.maxTheoryWork(),
+                    budget.maxStates(), limit, budget.maxComplexityDebt())));
+            assertEquals(limit == total, bounded.solved(), "work budget " + limit);
         }
     }
 

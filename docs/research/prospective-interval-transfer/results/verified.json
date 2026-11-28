@@ -1,0 +1,455 @@
+{
+  "freeze": "15f2fb41e876df5bb13138a2b9ed87340fa85146",
+  "deadline": 262144,
+  "uniquePaths": 1024,
+  "primaryCounts": {
+    "BASE": 1024,
+    "REGEN": 615,
+    "DROP": 836,
+    "FAST": 678,
+    "FAST_DROP": 959
+  },
+  "transferPassed": false,
+  "optimizedTransferPassed": false,
+  "improvedOnRegenAtPrimary": true,
+  "full": {
+    "BASE": {
+      "acquisition": 0,
+      "load": 0,
+      "preparation": 0,
+      "checkpoints": [
+        {
+          "budget": 262144,
+          "completed": 1024,
+          "solved": 1024
+        }
+      ],
+      "totalSolved": 1024,
+      "fullCost": 239616
+    },
+    "REGEN": {
+      "acquisition": 9130,
+      "load": 1620,
+      "preparation": 2078,
+      "checkpoints": [
+        {
+          "budget": 262144,
+          "completed": 615,
+          "solved": 615
+        }
+      ],
+      "totalSolved": 1024,
+      "fullCost": 427548
+    },
+    "DROP": {
+      "acquisition": 9130,
+      "load": 1620,
+      "preparation": 2078,
+      "checkpoints": [
+        {
+          "budget": 262144,
+          "completed": 836,
+          "solved": 836
+        }
+      ],
+      "totalSolved": 1024,
+      "fullCost": 317980
+    },
+    "FAST": {
+      "acquisition": 9130,
+      "load": 1620,
+      "preparation": 2100,
+      "checkpoints": [
+        {
+          "budget": 262144,
+          "completed": 678,
+          "solved": 678
+        }
+      ],
+      "totalSolved": 1024,
+      "fullCost": 388658
+    },
+    "FAST_DROP": {
+      "acquisition": 9130,
+      "load": 1620,
+      "preparation": 2100,
+      "checkpoints": [
+        {
+          "budget": 262144,
+          "completed": 959,
+          "solved": 959
+        }
+      ],
+      "totalSolved": 1024,
+      "fullCost": 279090
+    }
+  },
+  "strata": {
+    "BASE": {
+      "2L": {
+        "attempts": 256,
+        "completedAtDeadline": 256,
+        "solvedAtDeadline": 256,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 20480,
+        "verificationWithinQuery": 768,
+        "replay": 768,
+        "audit": 21504,
+        "streamWork": 42752,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 102,
+        "fastWins": 0,
+        "fastLosses": 87
+      },
+      "2R": {
+        "attempts": 256,
+        "completedAtDeadline": 256,
+        "solvedAtDeadline": 256,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 20992,
+        "verificationWithinQuery": 768,
+        "replay": 768,
+        "audit": 21504,
+        "streamWork": 43264,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 102,
+        "fastWins": 0,
+        "fastLosses": 87
+      },
+      "3L": {
+        "attempts": 256,
+        "completedAtDeadline": 256,
+        "solvedAtDeadline": 256,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 43520,
+        "verificationWithinQuery": 1536,
+        "replay": 1536,
+        "audit": 31232,
+        "streamWork": 76288,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 102,
+        "fastWins": 0,
+        "fastLosses": 86
+      },
+      "3R": {
+        "attempts": 256,
+        "completedAtDeadline": 256,
+        "solvedAtDeadline": 256,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 44544,
+        "verificationWithinQuery": 1536,
+        "replay": 1536,
+        "audit": 31232,
+        "streamWork": 77312,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 103,
+        "fastWins": 0,
+        "fastLosses": 86
+      }
+    },
+    "REGEN": {
+      "2L": {
+        "attempts": 256,
+        "completedAtDeadline": 154,
+        "solvedAtDeadline": 154,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 43008,
+        "verificationWithinQuery": 768,
+        "replay": 768,
+        "audit": 21504,
+        "streamWork": 65280,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 0,
+        "fastWins": 15,
+        "fastLosses": 0
+      },
+      "2R": {
+        "attempts": 256,
+        "completedAtDeadline": 154,
+        "solvedAtDeadline": 154,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 44288,
+        "verificationWithinQuery": 768,
+        "replay": 768,
+        "audit": 21504,
+        "streamWork": 66560,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 0,
+        "fastWins": 15,
+        "fastLosses": 0
+      },
+      "3L": {
+        "attempts": 256,
+        "completedAtDeadline": 154,
+        "solvedAtDeadline": 154,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 107264,
+        "verificationWithinQuery": 1536,
+        "replay": 1536,
+        "audit": 31232,
+        "streamWork": 140032,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 0,
+        "fastWins": 16,
+        "fastLosses": 0
+      },
+      "3R": {
+        "attempts": 256,
+        "completedAtDeadline": 153,
+        "solvedAtDeadline": 153,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 110080,
+        "verificationWithinQuery": 1536,
+        "replay": 1536,
+        "audit": 31232,
+        "streamWork": 142848,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 0,
+        "fastWins": 17,
+        "fastLosses": 0
+      }
+    },
+    "DROP": {
+      "2L": {
+        "attempts": 256,
+        "completedAtDeadline": 209,
+        "solvedAtDeadline": 209,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 33280,
+        "verificationWithinQuery": 768,
+        "replay": 768,
+        "audit": 21504,
+        "streamWork": 55552,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 55,
+        "fastWins": 0,
+        "fastLosses": 40
+      },
+      "2R": {
+        "attempts": 256,
+        "completedAtDeadline": 209,
+        "solvedAtDeadline": 209,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 34560,
+        "verificationWithinQuery": 768,
+        "replay": 768,
+        "audit": 21504,
+        "streamWork": 56832,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 55,
+        "fastWins": 0,
+        "fastLosses": 40
+      },
+      "3L": {
+        "attempts": 256,
+        "completedAtDeadline": 209,
+        "solvedAtDeadline": 209,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 62208,
+        "verificationWithinQuery": 1536,
+        "replay": 1536,
+        "audit": 31232,
+        "streamWork": 94976,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 55,
+        "fastWins": 0,
+        "fastLosses": 39
+      },
+      "3R": {
+        "attempts": 256,
+        "completedAtDeadline": 209,
+        "solvedAtDeadline": 209,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 65024,
+        "verificationWithinQuery": 1536,
+        "replay": 1536,
+        "audit": 31232,
+        "streamWork": 97792,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 56,
+        "fastWins": 0,
+        "fastLosses": 39
+      }
+    },
+    "FAST": {
+      "2L": {
+        "attempts": 256,
+        "completedAtDeadline": 169,
+        "solvedAtDeadline": 169,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 37120,
+        "verificationWithinQuery": 768,
+        "replay": 768,
+        "audit": 21504,
+        "streamWork": 59392,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 15,
+        "fastWins": 0,
+        "fastLosses": 0
+      },
+      "2R": {
+        "attempts": 256,
+        "completedAtDeadline": 169,
+        "solvedAtDeadline": 169,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 38400,
+        "verificationWithinQuery": 768,
+        "replay": 768,
+        "audit": 21504,
+        "streamWork": 60672,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 15,
+        "fastWins": 0,
+        "fastLosses": 0
+      },
+      "3L": {
+        "attempts": 256,
+        "completedAtDeadline": 170,
+        "solvedAtDeadline": 170,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 93696,
+        "verificationWithinQuery": 1536,
+        "replay": 1536,
+        "audit": 31232,
+        "streamWork": 126464,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 16,
+        "fastWins": 0,
+        "fastLosses": 0
+      },
+      "3R": {
+        "attempts": 256,
+        "completedAtDeadline": 170,
+        "solvedAtDeadline": 170,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 96512,
+        "verificationWithinQuery": 1536,
+        "replay": 1536,
+        "audit": 31232,
+        "streamWork": 129280,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 17,
+        "fastWins": 0,
+        "fastLosses": 0
+      }
+    },
+    "FAST_DROP": {
+      "2L": {
+        "attempts": 256,
+        "completedAtDeadline": 240,
+        "solvedAtDeadline": 240,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 27392,
+        "verificationWithinQuery": 768,
+        "replay": 768,
+        "audit": 21504,
+        "streamWork": 49664,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 86,
+        "fastWins": 0,
+        "fastLosses": 71
+      },
+      "2R": {
+        "attempts": 256,
+        "completedAtDeadline": 240,
+        "solvedAtDeadline": 240,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 28672,
+        "verificationWithinQuery": 768,
+        "replay": 768,
+        "audit": 21504,
+        "streamWork": 50944,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 86,
+        "fastWins": 0,
+        "fastLosses": 71
+      },
+      "3L": {
+        "attempts": 256,
+        "completedAtDeadline": 239,
+        "solvedAtDeadline": 239,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 48640,
+        "verificationWithinQuery": 1536,
+        "replay": 1536,
+        "audit": 31232,
+        "streamWork": 81408,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 85,
+        "fastWins": 0,
+        "fastLosses": 69
+      },
+      "3R": {
+        "attempts": 256,
+        "completedAtDeadline": 240,
+        "solvedAtDeadline": 240,
+        "fullSolved": 256,
+        "learnedSteps": 0,
+        "query": 51456,
+        "verificationWithinQuery": 1536,
+        "replay": 1536,
+        "audit": 31232,
+        "streamWork": 84224,
+        "overBudget": 0,
+        "regenWins": 0,
+        "regenLosses": 87,
+        "fastWins": 0,
+        "fastLosses": 70
+      }
+    }
+  },
+  "elapsedNanos": [
+    {
+      "BASE": 1847453119,
+      "REGEN": 1409062714,
+      "DROP": 723334394,
+      "FAST": 717858825,
+      "FAST_DROP": 551339475
+    },
+    {
+      "BASE": 440814225,
+      "REGEN": 670070091,
+      "DROP": 697948302,
+      "FAST": 1108779443,
+      "FAST_DROP": 1861606778
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import de.regelsuche.ast.Expr;
 import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.moves.NativeNodeCountObjective;
 import de.regelsuche.search.moves.TypedMoveSearch;
 import java.util.List;
 import java.util.Set;
@@ -30,6 +31,25 @@ class CheckedDomainSizeReceiptsTest {
         assertEquals(3, score.value());
         assertTrue(score.work() > 3);
         assertNull(receipts.size(input.expression(), new CheckedSchemaSupport.Work()));
+    }
+
+    @Test void nodeGoalUsesOnlyPaidIdentityReceiptsAndPreservesTheFullObjectiveOnAMiss() {
+        var source = state("x+y*z");
+        var equalCopy = state("x+y*z");
+        var outsideDomain = state("x/y");
+        for (var input : List.of(source, equalCopy, outsideDomain, state("sin(x)"))) {
+            var ordinary = NativeNodeCountObjective.INSTANCE.evaluate(input);
+            var actual = receipts.scoreGoal(input);
+            assertEquals(ordinary.value(), actual.value());
+            assertEquals(ordinary.work() + 1, actual.work());
+            assertNull(receipts.size(input.expression(), new CheckedSchemaSupport.Work()));
+        }
+        assertEquals(5, receipts.evaluate(source).value());
+        assertEquals(5, receipts.scoreGoal(source).value());
+        assertEquals(1, receipts.scoreGoal(source).work());
+        assertEquals(6, receipts.scoreGoal(equalCopy).work());
+        receipts.evaluate(outsideDomain);
+        assertEquals(4, receipts.scoreGoal(outsideDomain).work());
     }
 
     @Test void retainingMoreThanTheBoundEvictsAndPaysForClearing() {

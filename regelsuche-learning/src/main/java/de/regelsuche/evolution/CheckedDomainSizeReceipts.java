@@ -33,6 +33,16 @@ final class CheckedDomainSizeReceipts implements RetainedGraph.View {
         }
     }
 
+    /** A miss uses the original objective across its entire grammar, without issuing a domain receipt. */
+    TypedSourceOnlySearch.Score scoreGoal(TypedMoveSearch.State state) {
+        if (RetainedOperation.isObserved()) return NativeNodeCountObjective.INSTANCE.evaluate(state);
+        var work = new Work();
+        Integer known = size(state.expression(), work);
+        if (known != null) return new TypedSourceOnlySearch.Score(known, work.units);
+        var fallback = NativeNodeCountObjective.INSTANCE.evaluate(state);
+        return new TypedSourceOnlySearch.Score(fallback.value(), Math.addExact(work.units, fallback.work()));
+    }
+
     synchronized void remember(Expr expression, int count, Work work) {
         if (RetainedOperation.isObserved()) return;
         if (sizes.size() == CAPACITY) {
