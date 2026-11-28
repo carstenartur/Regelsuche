@@ -90,10 +90,7 @@ final class RetainedTraceAcquisition {
                 var solved = primitive.solve(ordinary);
                 referenceWork = Math.addExact(referenceWork,solved.evidence().totalWork());
                 references.add(proof(solved.evidence(),solved.solved(),solved.evidence().totalWork()));
-                int depth = solved.solved() ? Math.max(1,solved.evidence().witness().size()-1) : 32;
-                // Ask for a shorter proof within the price of the primitive solution we just measured.
-                long cap = solved.solved() ? Math.clamp(solved.evidence().totalWork(),1L,8192L) : 8192L;
-                gates.add(task(row,depth,cap));
+                gates.add(ProofDepthChallenge.from(solved).orElse(ordinary));
             }
         }
         var update = CumulativeTaskKnowledge.empty(INVENTORY).learnLocalBatch(lessons,gates,1_000_000);
