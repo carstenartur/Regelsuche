@@ -1,0 +1,21 @@
+# A prospective cold-start amortization test across two expression families
+
+The [128-task Horner study](../prospective-horner-transfer/protocol.md) finished with a tie at its primary deadline. Its prepared regenerated-witness solver used fewer query and audit units over the full stream than the primitive solver, leaving a candidate amortization effect. This is one prespecified follow-up using the same model, solver code and four arms. There is no retraining or product tuning for these inputs. Report the result either way and stop this series after this follow-up.
+
+## Primary outcome
+
+All arms process one ordered stream of **1,024** inputs from cold start with **524,288 logical units**. Count the verified completions whose cumulative finish time, including the entire upfront acquisition/load/preparation cost, is at most the deadline. The regenerated-witness arm (REGEN) must finish strictly more tasks than both ordinary primitive search (BASE) and the identical prepared solver with learned providers removed (DROP). Ties fail. Also compare with the existing full-verifier learned arm (PRIOR). Attribute an improvement to regenerated verification at this deadline only if REGEN beats PRIOR too. Use exactly the existing per-task limits, charges, failure treatment, full witness replay, additional exact polynomial audit and two reversed-order JVM runs of the Horner study.
+
+## Frozen sequence
+
+Publish this protocol first. Publish the common evaluator, unchanged product implementation and model references before producing any new FINAL case. The seed is the **first published full lowercase freeze-commit SHA** for this follow-up. Evaluate this seed once in two fresh JVMs. No new settings, seeds or exclusions may depend on FINAL. The generator and previous Horner results are known during design. The new instances and the dot-product topology were absent from training and validation. Both families contain the same known local distributive form.
+
+There are 128 blocks of eight. Each block contains one task for each pair of topology (literal labels `H`, `D`) and number of expanded coefficients (0, 1, 2, 3). Sort these pairs within the block by the hexadecimal SHA-256 of UTF-8 `seed/order/block/topology/count`, breaking ties by label and numeric count. Use global index `t=8*block+slot` and distinct integer `n=10001+t`. Rank indices 0, 1 and 2 by SHA-256 of `seed/position/t/index`, with numeric tie breaker. Reuse the published Horner generator's reduced coefficients, distributed forms and zero-control insertion. Expand the first count ranked positions, or add zero at the first position for count zero. Use `(A*r+B)*s+C` for H with a 17-node goal. Use `(A*r+B*s)+C*t` for D with a 19-node goal (the final `t` here is a symbolic variable). The solver sees only the source, empty assumptions and node bound. No goal expression, family label, origin or ordering key is available to it.
+
+Ordered coefficient multisets of the exact normalized polynomials must distinguish every new case from every other new case, from the 128 prior final cases and from all training and validation sources. Verify this exclusion before evaluation. Stop and disclose an inconclusive or invalid split. This is a synthetic stream of related variants, not 1,024 independent families.
+
+## Secondary outcomes and evidence
+
+Report verified completions, wins and losses separately for each topology at the primary deadline by matching task indices with each control; uncompleted and unsolved tasks receive zero credit. At full stream completion report per-topology totals for attempted tasks, solved tasks, query plus replay plus exact audit. Charge upfront costs once in the overall result and disclose them separately rather than allocating them to a topology. Report combined costs and outcomes at stream end for all four arms. The two per-topology results and full-stream costs do not change the primary decision. Report elapsed observations separately.
+
+Run all 1,024 attempts even after crossing the primary deadline and retain paths and costs for failures. Compare both independent JVM ledgers and summaries byte for byte. Lossless reproducible gzip archives may hold the original per-arm rows and witness dictionary. The primary comparison uses the one preregistered deadline; there is no budget sweep for selecting a favorable endpoint.

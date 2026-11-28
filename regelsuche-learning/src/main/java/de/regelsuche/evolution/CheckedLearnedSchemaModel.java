@@ -839,6 +839,12 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
 
     /** Checks one supplied occurrence and substitution; never enumerates primitive paths or other sites. */
     public TypedMoveSearch.Verifier verifier() {
+        return verifier(false);
+    }
+
+    // Both modes independently match the same source and regenerate the complete evidence.
+    // In the optional mode the match itself supplies the substitution for regeneration.
+    TypedMoveSearch.Verifier verifier(boolean deriveBindings) {
         return (source, move, context) -> {
             var work = new Work();
             work.add(1);
@@ -850,7 +856,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                 }
                 if (!(move.provenance() instanceof TransformationProvenance.ExactTheoryStep step)
                         || !move.ruleId().equals(descriptor.id())) return rejected(work, "CHECKED_SCHEMA_PROVENANCE_REQUIRED");
-                var checked = replayBinding(source, step.evidence().binding(), work);
+                var checked = replayBinding(source, step.evidence().binding(), work, deriveBindings);
                 var expected = SearchMove.from(Transformation.exactTheory(ExactTheoryEvidence.fromVerified(checked)), descriptor, move.generationCost());
                 // StateValue assesses capabilities after mathematical admission. MoveSearch overwrites
                 // provider-supplied deltas with that assessment before retaining the witness. These
@@ -873,6 +879,17 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
      */
     public NativeVerification replayApplication(TypedMoveSearch.State source, ExactTheoryEvidence.Binding binding,
             TypedMoveSearch.Context context) {
+        return replayApplication(source, binding, context, false);
+    }
+
+    /** Validate exported evidence by deriving the bindings from the checked source occurrence. */
+    public NativeVerification replayApplicationFromSource(TypedMoveSearch.State source, ExactTheoryEvidence.Binding binding,
+            TypedMoveSearch.Context context) {
+        return replayApplication(source, binding, context, true);
+    }
+
+    private NativeVerification replayApplication(TypedMoveSearch.State source, ExactTheoryEvidence.Binding binding,
+            TypedMoveSearch.Context context, boolean deriveBindings) {
         var work = new Work();
         work.add(1);
         try {
@@ -883,7 +900,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                 try {
                     if (!NativeMoveProvider.carries(requiredAssumptions,source,context))
                         throw new ReplayRejected("CHECKED_SCHEMA_PREREQUISITES_MISSING");
-                    var checked = replayBinding(source,binding,work);
+                    var checked = replayBinding(source, binding, work, deriveBindings);
                     results[0] = checked;
                     if (!checked.binding().equals(binding))
                         throw new ReplayRejected("CHECKED_SCHEMA_TARGET_OR_EVIDENCE_MISMATCH");
@@ -913,7 +930,8 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         }
     }
 
-    private VerifiedApplication replayBinding(TypedMoveSearch.State source,ExactTheoryEvidence.Binding binding,Work work) {
+    private VerifiedApplication replayBinding(TypedMoveSearch.State source,ExactTheoryEvidence.Binding binding,Work work,
+            boolean deriveBindings) {
         var replay = new BindingReplay(source,binding,work);
         RetainedOperation.Frame retained=null,jsonOwner=null;
         Throwable failure=null;
@@ -922,7 +940,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             replay.json=RetainedJson.open();
             RetainedOperation.work(1);
             jsonOwner=RetainedOperation.retain(replay.json);
-            try { replay.run(); }
+            try { replay.run(deriveBindings); }
             catch (ReplayRejected | DomainRejected rejected) {
                 replay.rejection=rejected.getMessage();replay.domainRejected=rejected instanceof DomainRejected;
                 RetainedOperation.work(2);
@@ -973,7 +991,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
             v.reference(data);v.reference(encodedSource);v.reference(path);v.reference(substitutions);
             v.reference(decoded);v.reference(checked);v.reference(rejection);v.reference(json);
         }
-        void run() {
+        void run(boolean deriveBindings) {
             data = read(binding.canonicalEvidenceJson());
             RetainedOperation.work(1);
             RetainedOperation.checkpoint();
@@ -999,22 +1017,25 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                 RetainedOperation.work(1);
             }
             RetainedOperation.checkpoint();
-            checked = replayOccurrence(schema,source.expression(),encodedSource,path,()->{
-                substitutions = new TreeMap<>();
-                RetainedOperation.work(1);
-                array(data.get("bindings"), 16);
-                for (var value : data.get("bindings")) {
-                    fields(value, "name", "expression");
-                    decoded = CODEC.decodeExpression(text(value, "expression"));
-                    domain(decoded, bounds, work);
-                    var previous = substitutions.put(text(value, "name"), decoded);
-                    RetainedOperation.work(2);
-                    if (previous != null) throw new ReplayRejected("CHECKED_SCHEMA_DUPLICATE_BINDING");
-                    RetainedOperation.checkpoint();
-                }
-                return substitutions;
-            },work);
+            checked = replayOccurrence(schema, source.expression(), encodedSource, path,
+                deriveBindings ? null : this::readBindings, work);
             if (checked == null) throw new ReplayRejected("CHECKED_SCHEMA_UNCHANGED");
+        }
+
+        private Map<String, Expr> readBindings() {
+            substitutions = new TreeMap<>();
+            RetainedOperation.work(1);
+            array(data.get("bindings"), 16);
+            for (var value : data.get("bindings")) {
+                fields(value, "name", "expression");
+                decoded = CODEC.decodeExpression(text(value, "expression"));
+                domain(decoded, bounds, work);
+                var previous = substitutions.put(text(value, "name"), decoded);
+                RetainedOperation.work(2);
+                if (previous != null) throw new ReplayRejected("CHECKED_SCHEMA_DUPLICATE_BINDING");
+                RetainedOperation.checkpoint();
+            }
+            return substitutions;
         }
     }
     private static void observeImportFailure(Throwable failure) {
@@ -1056,8 +1077,10 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         Throwable primary=null;
         try {
             try {
-                var substitutions=bindings.get();pending[0]=substitutions;
-                if(!substitutions.equals(outcome.matches().getFirst().bindings()))
+                var matched = outcome.matches().getFirst().bindings();
+                var substitutions = bindings == null ? matched : bindings.get();
+                pending[0] = substitutions;
+                if (bindings != null && !substitutions.equals(matched))
                     throw new ReplayRejected("CHECKED_SCHEMA_BINDING_MISMATCH");
                 var applicationWork=new Work();pending[1]=applicationWork;
                 try { pending[2]=apply(schema,source,encodedSource,path,substitutions,applicationWork); }

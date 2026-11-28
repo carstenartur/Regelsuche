@@ -1,6 +1,14 @@
 package de.regelsuche.evolution;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.search.moves.MoveVerifier;
+import de.regelsuche.search.moves.NativeMoveProof;
+import de.regelsuche.search.program.AstTransportObservation;
+import de.regelsuche.search.program.CompiledAstReplayCodec;
+import de.regelsuche.transform.ExactTheoryEvidence;
+import de.regelsuche.transform.TransformationProvenance;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.moves.ExprIncrementalProvider;
 import de.regelsuche.search.moves.MoveContext;
@@ -114,6 +122,91 @@ class CheckedSchemaSelectionDifferentialTest {
         }
     }
 
+    @Test void sourceDerivedReplayDropsOnlyTheSecondBindingReadAndPreservesTheExactWitness() {
+        Expr source = parse("(((a/7+b)-y)+y)+0");
+        var state = state(source);
+        var move = selected.candidates(state, CONTEXT).moves().getFirst().exportLegacy();
+        var context = TypedMoveSearch.Context.frozen(parse("a/7+b"));
+        MoveVerifier.Verification previous;
+        long decodes;
+        long encodes;
+        long evidenceWrites;
+        try (var transport = AstTransportObservation.open()) {
+            previous = model.verifier().verify(state, move, context);
+            decodes = transport.count(AstTransportObservation.Operation.EXPRESSION_DECODE);
+            encodes = transport.count(AstTransportObservation.Operation.EXPRESSION_ENCODE);
+            evidenceWrites = transport.count(AstTransportObservation.Operation.EVIDENCE_JSON_WRITE);
+        }
+        assertTrue(previous.accepted());
+        assertTrue(decodes > 0 && evidenceWrites > 0);
+        try (var transport = AstTransportObservation.open()) {
+            var checked = model.verifier(true).verify(state, move, context);
+            assertTrue(checked.accepted());
+            assertEquals(previous.receipts(), checked.receipts());
+            assertTrue(checked.work() > 0 && checked.work() < previous.work());
+            assertEquals(0, transport.count(AstTransportObservation.Operation.EXPRESSION_DECODE));
+            assertEquals(encodes, transport.count(AstTransportObservation.Operation.EXPRESSION_ENCODE));
+            assertEquals(evidenceWrites, transport.count(AstTransportObservation.Operation.EVIDENCE_JSON_WRITE));
+        }
+        assertFalse(model.verifier(true).verify(state(parse("(((a/7+b)-y)+z)+0")), move, context).accepted());
+    }
+
+    @Test void sourceDerivedImportRejectsTamperedMissingExtraAndNoncanonicalBindings() throws Exception {
+        Expr source = parse("((x-y)+y)+0");
+        var move = selected.candidates(state(source), CONTEXT).moves().getFirst().exportLegacy();
+        var binding = ((TransformationProvenance.ExactTheoryStep) move.provenance()).evidence().binding();
+        var context = TypedMoveSearch.Context.frozen(parse("x"));
+        var accepted = model.replayApplicationFromSource(state(source), binding, context);
+        assertTrue(accepted.accepted());
+        var proof = assertInstanceOf(NativeMoveProof.Exact.class, accepted.checkedProof());
+        assertEquals(binding, proof.evidence().exportLegacy().binding());
+
+        var canonical = (ObjectNode) new ObjectMapper().readTree(binding.canonicalEvidenceJson());
+        var codec = new CompiledAstReplayCodec();
+        var changed = canonical.deepCopy();
+        ((ObjectNode) changed.get("bindings").get(0)).put("expression", codec.encodeExpression(parse("y+7")));
+        var extra = canonical.deepCopy();
+        extra.withArray("bindings").addObject().put("name", "unexpected").put("expression", codec.encodeExpression(parse("u")));
+        var missing = canonical.deepCopy();
+        missing.withArray("bindings").remove(0);
+        for (String mutation : List.of(changed.toString(), extra.toString(), missing.toString(), canonical.toPrettyString())) {
+            var forged = new ExactTheoryEvidence.Binding(binding.sourceExpression(), binding.transformedExpression(),
+                binding.theoryStepId(), SchematicProofPlan.hash(mutation), binding.receiptArtifactId(), binding.runArtifactId(),
+                binding.canonicalWorkUnits(), mutation);
+            for (var check : List.of(model.replayApplicationFromSource(state(source), forged, context),
+                    model.replayApplication(state(source), forged, context))) {
+                assertFalse(check.accepted());
+                assertTrue(check.work() > 0);
+                assertNull(check.checkedProof());
+            }
+        }
+    }
+
+    @Test void regeneratedWitnessIsRecheckedOnBothPassesAndTheTotalBudgetIncludesFinalReplay() {
+        var query = task("(((r+s)/7)+0)*1", 5);
+        var reference = inventory.newTaskSolverWithSelection(model, true);
+        var optimized = inventory.newTaskSolverWithRegeneratedWitness(model);
+        assertNotEquals(reference.preparationReceipt(), optimized.preparationReceipt());
+        var previous = reference.solve(query);
+        var actual = optimized.solve(query);
+        assertTrue(previous.solved() && actual.solved());
+        assertEquals(previous.evidence().witness().stream().map(step -> step.move()).toList(),
+            actual.evidence().witness().stream().map(step -> step.move()).toList());
+        assertTrue(actual.learnedApplications() > 0);
+        assertTrue(actual.evidence().queryWork() < previous.evidence().queryWork());
+        assertTrue(actual.evidence().replayWork() > 0 && actual.evidence().replayWork() < previous.evidence().replayWork());
+
+        var budget = query.budget();
+        long total = actual.evidence().totalWork();
+        for (long limit : List.of(1L, total - 1, total)) {
+            var bounded = optimized.solve(new CheckedSchemaTaskSolver.Task(query.source(), query.assumptions(), query.goal(),
+                new MoveSearch.Budget(budget.maxPrimitiveSteps(), budget.maxSearchDepth(), budget.maxTheoryWork(),
+                    budget.maxStates(), limit, budget.maxComplexityDebt())));
+            assertEquals(limit == total, bounded.solved(), "work budget " + limit);
+            if (limit == total - 1) assertTrue(bounded.evidence().totalWork() > limit);
+        }
+    }
+
     @Test void anAbsentOperatorCanExcludeAllLearnedRulesOnlyIfPrimitivesCannotIntroduceIt() {
         var query = task("r^1", 1);
         var original = inventory.newTaskSolverWithSelection(model, true);
@@ -135,6 +228,10 @@ class CheckedSchemaSelectionDifferentialTest {
             routed.evidence().witness().stream().map(step -> step.move().sourceKind()).toList());
         assertEquals(parse("r"), routed.evidence().incumbent().expression());
         assertTrue(routed.evidence().replayWork() > 0);
+    }
+
+    private static TypedMoveSearch.State state(Expr source) {
+        return new TypedMoveSearch.State(source, 0, 0, "", List.of(), Set.of(), 0);
     }
 
     private static Expr parse(String source) {

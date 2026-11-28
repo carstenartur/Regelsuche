@@ -148,13 +148,14 @@ public final class CheckedSchemaTaskSolver {
         this.expansionBridgesForOtherGoals = expansionBridgesForOtherGoals;
     }
 
-    CheckedSchemaTaskSolver withPrimitiveRoute(List<MoveProvider> primitives, PrimitiveSchemaReachability route) {
+    CheckedSchemaTaskSolver withPrimitiveRoute(List<MoveProvider> primitives, PrimitiveSchemaReachability route,
+            String routeRevision) {
         var guarded = new java.util.ArrayList<>(primitives);
         guarded.set(0, route.withDomainCheck(guarded.getFirst()));
         var fallback = new CheckedSchemaTaskSolver(new TypedLearnedMoveInventory.SearchSession(guarded, List.of(), session.verifier()), null);
         var receipt = preparation;
-        var revision = receipt.revision() + "+" + PrimitiveSchemaReachability.REVISION;
-        var identity = receipt.configurationHash() + ";" + PrimitiveSchemaReachability.REVISION;
+        var revision = receipt.revision() + "+" + routeRevision;
+        var identity = receipt.configurationHash() + ";" + routeRevision;
         var routed = new CheckedSchemaMatcherPlan.Compilation(revision, SchematicProofPlan.hash(identity),
             Math.addExact(receipt.workUnits(), route.compilationWork() + identity.length()),
             receipt.includedSchemas(), receipt.patternNodeVisits() + route.patternVisits(), receipt.orderingComparisons());

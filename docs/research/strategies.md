@@ -388,7 +388,7 @@ Lerner und Strategieauswahl im aktuellen Checkout
 
 - [`CheckedSchemaMatcherPlan.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaMatcherPlan.java#L36) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaMatcherPlan.java | public final class CheckedSchemaMatcherPlan implements RetainedGraph.View { -->
 - [`PrimitiveSchemaReachability.java`](../../regelsuche-learning/src/main/java/de/regelsuche/evolution/PrimitiveSchemaReachability.java#L15) <!-- strategy-code: regelsuche-learning/src/main/java/de/regelsuche/evolution/PrimitiveSchemaReachability.java | final class PrimitiveSchemaReachability { -->
-- [`CheckedSchemaSelectionDifferentialTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java#L22) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java | class CheckedSchemaSelectionDifferentialTest { -->
+- [`CheckedSchemaSelectionDifferentialTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java#L30) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/CheckedSchemaSelectionDifferentialTest.java | class CheckedSchemaSelectionDifferentialTest { -->
 
 ## Distributive Teilableitungen bei gleicher Budgetgrenze
 
@@ -400,6 +400,16 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - **Entwicklungsnachlauf.** Ein zusätzlicher bezahlter Operatorvergleich bei einem Enkelknoten ließ alle Budgetentscheidungen gleich und erhöhte die Arbeit auf dem Referenzpanel um 532 Einheiten zuzüglich 441 für die Vorbereitung. [Paarwerte und getrennte Kosten für Dispatch und Zeugen](prospective-distributive-coverage/dispatch-followup/README.md)
 
 - [`DistributiveCoverageStudyTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/DistributiveCoverageStudyTest.java#L21) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/DistributiveCoverageStudyTest.java | class DistributiveCoverageStudyTest { -->
+
+## Gelernte Bindungen bei beiden Prüfungen aus der Quelle rekonstruieren
+
+- **Hypothese.** Ein Prüfer kann jede Substitution aus dem Quellausdruck erneut bestimmen und den vollständig rekonstruierten Beleg mit dem eingereichten Beleg vergleichen. Das spart das zweite Dekodieren der Substitutionsbäume. Geprüft wird, ob damit bei gleichem Gesamtetat mehr unbekannte Aufgaben lösbar werden.
+- **Umsetzungsstand.** Der optionale Modus `REGENERATED_WITNESS_WITH_ROUTING` verwendet das eingefrorene Modell. Die Suche prüft jeden übernommenen Lernschritt und wiederholt die Prüfung am Ende unabhängig. Die ursprünglichen Modi bleiben reproduzierbar.
+- **Befund.** In der prospektiven Horner-Studie lösten bei 131.072 kumulativen Arbeitseinheiten die primitive Suche, der frühere und der neue Lernsolver je 128 Aufgaben, die Variante mit entfernten Lernregeln 126. Die neue Prüfung senkte den vollständigen Aufwand des Lernsolvers von 113.745 auf 111.952. Die primitive Suche benötigte 102.567. Die beiden umgekehrten JVM-Läufe reproduzierten alle 512 Aufgabenbeobachtungen. [Protokoll, Vergleich und Rohdaten](prospective-horner-transfer/README.md)
+- **Folgerung.** Für diese Aufgaben spart das vorbereitete Modell 3.443 Arbeitseinheiten gegenüber der primitiven Suche. Der anfängliche Erwerbs- und Vorbereitungsaufwand von 12.828 Einheiten ist nach 128 Aufgaben noch nicht gedeckt.
+- **Vorab festgelegter Folgeversuch.** Auf 1.024 neuen Horner- und Skalarproduktaufgaben erreichte der neue Lernsolver bei 524.288 Gesamteinheiten 646 Lösungen, die primitive Suche 642, der frühere Lernsolver 635 und der neue Solver ohne Lernregeln 541. Der vollständige Durchlauf kostete 823.252 gegenüber 834.410 Einheiten primitiv. Alle vier Arme lösten am Ende alle Aufgaben. Der Vorteil von 1,34 Prozent gilt für diesen synthetischen Aufgabenstrom einschließlich Erwerb, Vorbereitung, Suche und unabhängiger Prüfungen. [Protokoll, Rohdaten und unabhängige Prüfung](prospective-amortization/README.md)
+
+- [`HornerTransferStudyTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/HornerTransferStudyTest.java#L32) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/HornerTransferStudyTest.java | class HornerTransferStudyTest { -->
 
 ## Vorbereitetes Aufgabenwissen über mehrere Anfragen
 
