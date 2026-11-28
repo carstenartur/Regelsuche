@@ -74,3 +74,7 @@ cmp "$run_dir/compared/outputs.json" "$study/results/outputs.json"
 ```
 
 The two JVMs produced identical outcomes, outputs, costs and witness hashes on all 1,224 rows, including unsuccessful prefixes. The 121 distinct witnesses are dictionary-coded by the zero-based `path` column in [paths.jsonl](results/paths.jsonl). Every step includes the selected schema if present, before/after expressions and verification work. The zero-based `output` column indexes [outputs.json](results/outputs.json). The [summary](results/summary.json) records timing, both raw run hashes, alpha overlaps and the primary decision. External polynomial audit work appears in the CSV's `audit` column. The published [training receipt](freeze.json) separates acquisition, training traces and validation from the [canonical model](snapshot.json).
+
+## Subsequent development
+
+An exploratory [instrumented dispatch comparison](dispatch-followup/README.md) on the known panel tested a deeper occurrence filter, including preparation, replay, and all original control rows.

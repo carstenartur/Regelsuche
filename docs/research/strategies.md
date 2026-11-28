@@ -387,6 +387,8 @@ Lerner und Strategieauswahl im aktuellen Checkout
 - **Befund.** Auf vier parallelen Aufgaben sank die Abfragearbeit von jeweils 636 auf 543 Einheiten, auf vier verschachtelten von 584 auf 552. Bei den vorab gewählten Budgets löste das Modell 200 von 384 Aufgaben-Budget-Paaren, die primitive Suche 220 und die Anbieterkontrolle 208. Bei hohem Budget lösten alle drei dieselben 20 von 24 Aufgaben. [Budgetkurve, Zeugen und Familienvergleich](prospective-distributive-coverage/README.md)
 - **Folgerung.** Der kürzere Beweis erspart auf zwei Familien Arbeit. Im Gesamtvergleich überwogen die Verluste beim Normalisieren und bei Aufgaben, deren gewählter Beweis ausschließlich primitive Regeln nutzt. Erwerb, Laden und Vorbereitung kosteten weitere 12.805 Einheiten.
 
+- **Entwicklungsnachlauf.** Ein zusätzlicher bezahlter Operatorvergleich bei einem Enkelknoten ließ alle Budgetentscheidungen gleich und erhöhte die Arbeit auf dem Referenzpanel um 532 Einheiten zuzüglich 441 für die Vorbereitung. [Paarwerte und getrennte Kosten für Dispatch und Zeugen](prospective-distributive-coverage/dispatch-followup/README.md)
+
 - [`DistributiveCoverageStudyTest.java`](../../regelsuche-learning/src/test/java/de/regelsuche/evolution/DistributiveCoverageStudyTest.java#L21) <!-- strategy-code: regelsuche-learning/src/test/java/de/regelsuche/evolution/DistributiveCoverageStudyTest.java | class DistributiveCoverageStudyTest { -->
 
 ## Vorbereitetes Aufgabenwissen über mehrere Anfragen
