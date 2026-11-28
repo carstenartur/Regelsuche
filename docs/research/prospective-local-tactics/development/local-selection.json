@@ -1,0 +1,118 @@
+{
+  "purpose": "Development selection on the previously published panels C and D before generating any panel E instance.",
+  "panelSeed": "27bb13a8c861578912ef968ab73b2d06cb95fce7",
+  "casesPerPanel": 512,
+  "coldDeadlinePerPanel": 524288,
+  "selectBetweenLocalVariants": {
+    "fixedBeforeTwoPhasePilot": [
+      "Require a genuine learned proof in LocalTacticSearchTest.appliesALearnedRuleBelowTheRootAndAblatesAfterAdmission.",
+      "Prefer more total cold deadline completions on C plus D.",
+      "Break a tie by lower combined full-stream work."
+    ],
+    "pilotAllowanceFixedBeforeMeasurement": "If primitive steps are allowed, try native primitive search with an allowance of min(original budget, max(1024, floor(original budget / 2))) less incurred selection work. Escalate only with remaining budget. All actual search and replay work is charged.",
+    "winner": "twoPhase",
+    "byDeadlineSum": {
+      "onePhase": 648,
+      "twoPhase": 864
+    },
+    "reason": "More deadline completions on C plus D."
+  },
+  "reference": {
+    "arm": "SHARED",
+    "origin": "Published primitive solver with shared native node counts.",
+    "panels": {
+      "C": {
+        "byDeadline": 384,
+        "individuallySolved": 384,
+        "fullWork": 291488,
+        "setup": 0,
+        "learnedWitnessSteps": 0,
+        "rowSha256": "bf591e136ea9f149d5392ccc654f46e8529ae4b0b9a8e3d23969c58d6a710063"
+      },
+      "D": {
+        "byDeadline": 480,
+        "individuallySolved": 480,
+        "fullWork": 183362,
+        "setup": 0,
+        "learnedWitnessSteps": 0,
+        "rowSha256": "0864901f452339381e6e2713f9be39471e4766b9242242e5ede70a4bbb17220a"
+      }
+    }
+  },
+  "localVariants": {
+    "onePhase": {
+      "origin": "Direct local lookup before search. Two opposite JVM rotations; independently reproduced a third time from the preserved first QA source snapshot.",
+      "sourceSha256": {
+        "LocalTacticSearch.java": "b560ad4cf523a7cfbf1ff051f88d15116c54aa7cf54ec38b80fc0bfd253de0c5",
+        "CheckedLearnedSchemaModel.java": "a20d2eea91ed1b1fb35a8bcdb4c01c0a211a496bdedb9455a675119861512aa3",
+        "CheckedSchemaTaskSolver.java": "ec952e72c7fe468cb55604c391a8d12c397a95d56ba538016c6ed9c0d9d97b24"
+      },
+      "panels": {
+        "C": {
+          "byDeadline": 274,
+          "individuallySolved": 320,
+          "fullWork": 583495,
+          "setup": 180455,
+          "learnedWitnessSteps": 992,
+          "rowSha256": "1d2e5af49140e50ea6299cbfe012db36767214e75c945a9ba1de0a73b477581e"
+        },
+        "D": {
+          "byDeadline": 374,
+          "individuallySolved": 374,
+          "fullWork": 485107,
+          "setup": 180455,
+          "learnedWitnessSteps": 203,
+          "rowSha256": "295d51a37737c8edae5951448ffae5fcf905bb88dfd17d2d822af4b765147087"
+        }
+      }
+    },
+    "twoPhase": {
+      "origin": "Primitive pilot followed by paid local escalation. Two fresh JVM rotations from the selected sources.",
+      "solverCommit": "7ddec79c8e930b552e39e5f90def4405254cd92d",
+      "sourceSha256": {
+        "LocalTacticSearch.java": "35399a918d2fc6fea2e38435512de3b328526eb65d3d39994398a13305839cf6",
+        "CheckedLearnedSchemaModel.java": "f82449cd702d8e6e307934d7e9761306f36df0ee6b91c57366e87a8ea85cfa40",
+        "CheckedSchemaTaskSolver.java": "ec952e72c7fe468cb55604c391a8d12c397a95d56ba538016c6ed9c0d9d97b24"
+      },
+      "panels": {
+        "C": {
+          "byDeadline": 384,
+          "individuallySolved": 384,
+          "fullWork": 473644,
+          "setup": 178060,
+          "learnedWitnessSteps": 0,
+          "rowSha256": "22b9cdb5e01d962298fb7b42d9deecad94bf8e6e17ce262adc7c1d9af4ff3c8c"
+        },
+        "D": {
+          "byDeadline": 480,
+          "individuallySolved": 480,
+          "fullWork": 364494,
+          "setup": 178060,
+          "learnedWitnessSteps": 0,
+          "rowSha256": "388c3782eba9313b2efc064290ff55c3a8e416c693d7ef6b7201ce74a3ad98a6"
+        }
+      }
+    }
+  },
+  "earlierExploratoryRun": {
+    "origin": "Earlier local lookup prototype before the two-variant selection. One development run.",
+    "panels": {
+      "C": {
+        "byDeadline": 118,
+        "individuallySolved": 224,
+        "fullWork": 827975,
+        "setup": 180455,
+        "learnedWitnessSteps": 0,
+        "rowSha256": "0751c872a5ac7a0d003d78318ea51209035623af62be271bad76bbbe709c3fbd"
+      },
+      "D": {
+        "byDeadline": 352,
+        "individuallySolved": 352,
+        "fullWork": 509785,
+        "setup": 180455,
+        "learnedWitnessSteps": 0,
+        "rowSha256": "75d4453e81c9f2d7498a634765648d9708d1c91121ae49b35300a036aef29109"
+      }
+    }
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "family": "E",
+  "freeze": "892dcabf9fd24967009e225663940f62cc74010e",
+  "cases": 256,
+  "officialRows": 1280,
+  "officialDistinctPaths": 288,
+  "referenceRowsPerOrderingRun": 1024,
+  "referenceRowsPerStandaloneSubtreeRun": 256,
+  "subtreeRowSha256AcrossFourJvms": "0c33e7caea1cc28d57b58daac5d914dd648b00b93a196a54d26c2d560f3efeab",
+  "subtreePathsIdenticalAcrossFourJvms": 256,
+  "orderingTrainingSha256AcrossBothDevelopmentAndBothFinalJvms": "7999119708608dcce7608fddbfec6e95dc4a103a093570df6cf223c1168cf42b",
+  "primaryMargin": {
+    "bestControl": 224,
+    "bestArms": [
+      "SHARED"
+    ],
+    "required": 247,
+    "passed": false,
+    "zeroComparator": false,
+    "additionalSolved": -16
+  },
+  "timelySingleRuleWitnesses": [],
+  "officialLocalRowsIdenticalToDrop": true,
+  "sharedVersusLocalSolvedDisagreements": [
+    {
+      "orientation": 0,
+      "m": 3,
+      "cap": 256,
+      "sharedSolved": true,
+      "cases": 16
+    }
+  ],
+  "referenceArms": {
+    "SHARED": {
+      "setup": 0,
+      "totalSolved": 224,
+      "byDeadline": 224,
+      "fullCost": 170048,
+      "query": 63888,
+      "verificationInSearch": 2912,
+      "replay": 2912,
+      "audit": 103248,
+      "proofPaths": 256,
+      "rowSha256": "fbcec9551548188a7d1c281229516493b269057af5ad38bb40cab9b8a9a59d50"
+    },
+    "ORDERED": {
+      "setup": 13080,
+      "totalSolved": 208,
+      "byDeadline": 208,
+      "fullCost": 183272,
+      "query": 64288,
+      "verificationInSearch": 2896,
+      "replay": 2896,
+      "audit": 103008,
+      "proofPaths": 256,
+      "rowSha256": "ddbebbf14d0ff9ba0c7a2a948da8b9b19326e6ff709334b2cf372b39a56eefb4"
+    },
+    "DROP_ORDER": {
+      "setup": 13080,
+      "totalSolved": 208,
+      "byDeadline": 208,
+      "fullCost": 184920,
+      "query": 65440,
+      "verificationInSearch": 2912,
+      "replay": 2816,
+      "audit": 103584,
+      "proofPaths": 256,
+      "rowSha256": "1e3bc4d653ae3b0aa4574955e5ae2b749be8ef084e0e21dbebc1917eff484486"
+    },
+    "GREEDY": {
+      "setup": 0,
+      "totalSolved": 208,
+      "byDeadline": 208,
+      "fullCost": 171840,
+      "query": 65440,
+      "verificationInSearch": 2912,
+      "replay": 2816,
+      "audit": 103584,
+      "proofPaths": 256,
+      "rowSha256": "310bf827dcc185dc6c7442ee4614baf201c2d359cc9c94d0d35386e9ca18251e"
+    },
+    "SUBTREE": {
+      "setup": 0,
+      "totalSolved": 208,
+      "byDeadline": 208,
+      "fullCost": 172192,
+      "query": 65792,
+      "verificationInSearch": 2864,
+      "replay": 2768,
+      "audit": 103632,
+      "proofPaths": 256,
+      "rowSha256": "0c33e7caea1cc28d57b58daac5d914dd648b00b93a196a54d26c2d560f3efeab"
+    }
+  }
+}

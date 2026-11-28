@@ -290,6 +290,17 @@ keiner der 1.024 neuen Aufgaben den Regelmatcher ein. Sie erreichte **379 und
 480** rechtzeitige Lösungen.
 [Regelherkunft, zehn Vergleichsverfahren und eigenständige primitive Referenz](docs/research/prospective-retained-tactics/README.md)
 
+Eine aus 26 eigenen Beweisen gelernte **Reihenfolge primitiver Regeln**
+bringt auf demselben gemischten Strom **1.011 von 1.024** Lösungen ins
+Budget. Dieselbe Suche mit fester Reihenfolge erreicht **965**, die
+verzweigte Suche mit Teilbaumzählung **931**. Ab Aufgabe 345 sind Erwerb
+und Laden gegenüber der festen Reihenfolge dauerhaft bezahlt. Auf 256
+neuen quadrierten Residuen erreichen beide Reihenfolgen **208**. Hier
+gewinnt die bisherige primitive Suche mit **224**. Der getrennt geprüfte
+lokale Lernregelmatcher erreicht ebenfalls **208** und lässt auf diesen
+Aufgaben keine Lernregel zu.
+[Prospektiver Test, Amortisation und vollständige Beweise](docs/research/prospective-local-tactics/README.md)
+
 Der qualifizierte autonome Walkthrough bildet aus targetfreien Beobachtungen
 einen parametrisierten Kandidaten, trennt Kandidatenbildung und Prüfung und
 misst anschließend die Wiederverwendung auf zurückgehaltenen Aufgaben. Im hier

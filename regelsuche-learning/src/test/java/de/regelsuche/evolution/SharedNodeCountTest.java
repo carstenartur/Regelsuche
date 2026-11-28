@@ -27,6 +27,11 @@ class SharedNodeCountTest {
         assertTrue(shared.solved());
         assertEquals(previous.evidence().incumbent().expression(), shared.evidence().incumbent().expression());
         assertEquals(previous.evidence().witness(), shared.evidence().witness());
+        var subtree = solver.solveWithSubtreeNodeCounts(reducible);
+        assertTrue(subtree.solved());
+        assertEquals(previous.evidence().witness(), subtree.evidence().witness());
+        assertEquals(previous.evidence().incumbent().expression(), subtree.evidence().incumbent().expression());
+        assertTrue(subtree.evidence().replayWork() > 0);
         assertTrue(shared.evidence().replayWork() > 0);
         assertEquals(0, shared.learnedApplications());
 
@@ -46,7 +51,8 @@ class SharedNodeCountTest {
         var emptySession = new TypedLearnedMoveInventory.SearchSession(List.of(), List.of(),
             (state, move, context) -> { throw new AssertionError("empty inventory produced a move"); });
         var emptySolver = new CheckedSchemaTaskSolver(emptySession, null);
-        for (var answer : List.of(emptySolver.solve(stuck), emptySolver.solveWithSharedNodeCounts(stuck))) {
+        for (var answer : List.of(emptySolver.solve(stuck), emptySolver.solveWithSharedNodeCounts(stuck),
+                emptySolver.solveWithSubtreeNodeCounts(stuck))) {
             assertFalse(answer.solved());
             assertTrue(answer.evidence().search().completeBoundedRelation());
             assertEquals(MoveSearch.Outcome.BOUNDED_EXHAUSTED, answer.evidence().search().outcome());
@@ -73,6 +79,9 @@ class SharedNodeCountTest {
         var impossible = new CheckedSchemaTaskSolver.Goal(state -> new TypedSourceOnlySearch.Score(17, 2), 1);
         var custom = task("x+0", impossible);
         var result = solver.solveWithSharedNodeCounts(custom);
+        var customSubtree = solver.solveWithSubtreeNodeCounts(custom);
+        assertEquals(result.evidence().totalWork(), customSubtree.evidence().totalWork());
+        assertEquals(17, customSubtree.evidence().outputScore());
         assertFalse(result.solved());
         assertEquals(17, result.evidence().outputScore());
         assertEquals(solver.solve(custom).evidence().totalWork(), result.evidence().totalWork());
@@ -87,6 +96,9 @@ class SharedNodeCountTest {
         try (var scope = RetainedOperation.open(resources)) {
             var normal = solver.solve(nativeTask).evidence();
             var observed = solver.solveWithSharedNodeCounts(nativeTask).evidence();
+            var subtree = solver.solveWithSubtreeNodeCounts(nativeTask).evidence();
+            assertEquals(normal.totalWork(), subtree.totalWork());
+            assertEquals(normal.outputScore(), subtree.outputScore());
             assertEquals(normal.totalWork(), observed.totalWork());
             assertEquals(normal.outputScore(), observed.outputScore());
         }

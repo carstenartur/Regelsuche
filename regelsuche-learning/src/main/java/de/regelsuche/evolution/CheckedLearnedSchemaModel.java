@@ -120,6 +120,7 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         public PatternExpr source() { return source; }
         public PatternExpr target() { return target; }
         public String proofHash() { return proofHash; }
+        int structuralReduction() { return structuralReduction; }
         public List<String> assumptions() { return List.of(); }
         public List<String> supportingObservationIds() { return supportingObservationIds; }
     }
@@ -722,6 +723,36 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
         copy.add(index);
         return List.copyOf(copy);
     }
+
+    MoveProvider.Descriptor localDescriptor() { return descriptor; }
+
+    /** A privately constructed match binds immutable substitutions to one actual source instance. */
+    MoveProvider.Batch localCandidate(LocalTacticSearch.Site site, Work work) {
+        Transformation move = null;
+        if (site != null && byId.get(site.schema().id()) == site.schema()) {
+            work.add(2);
+            try {
+                domain(site.source(), bounds, work);
+                var applicationWork = new Work();
+                VerifiedApplication application;
+                try {
+                    application = apply(site.schema(), site.source(), CODEC.encodeExpression(site.source()), site.path(),
+                        site.bindings(), applicationWork);
+                } finally {
+                    work.add(applicationWork.units);
+                }
+                if (application != null) move = Transformation.exactTheory(ExactTheoryEvidence.fromVerified(application));
+            } catch (DomainRejected unsupported) {
+                work.add(1);
+            }
+        }
+        int count = move == null ? 0 : 1;
+        work.add(3L + count);
+        var metrics = batchMetrics(work, count, move == null ? ExecutionWork.ZERO : move.executionWork());
+        return new MoveProvider.Batch(move == null ? List.of() : List.of(SearchMove.from(move, descriptor, metrics.totalWorkUnits())),
+            metrics, false);
+    }
+
     private ExprMatcher.MatchOutcome match(Schema schema, Expr occurrence) {
         return ExprMatcher.pattern(schema.source()).match(occurrence, new ExprMatcher.MatchOptions(
             null, 1, bounds.maximumExpressionNodes() * 4, bounds.maximumExpressionNodes() * 4));
