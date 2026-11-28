@@ -42,7 +42,7 @@ class SpectralBatchRepairTest {
         assertEquals(2, prepared.costBreakdown().forwardRows());
         assertEquals(2, prepared.costBreakdown().inverseRows());
         assertEquals(12, prepared.costBreakdown().predictorApplications());
-        assertEquals(new OperatorResidualPlans.Cost(74, 88), prepared.cost());
+        assertEquals(new OperatorResidualPlans.Cost(70, 88), prepared.cost());
         var rows = List.of(List.of(ONE, integer(2), integer(3)),
                 List.of(integer(-2), integer(4), ONE), List.of(integer(5), ZERO, integer(-3)));
         assertEquals(List.of(List.of(integer(3), integer(4), integer(3)),
@@ -213,10 +213,10 @@ class SpectralBatchRepairTest {
     }
 
     @Test
-    void spectralDirectWinnerReconstructsFromItsCheckedZeroSyndromeCertificate() {
+    void crossRowSharingCanMakeDirectCheaperThanSpectralEvaluation() {
         int n = 8;
         var basis = ALG.matrix(n, n,
-                (i, j) -> Polynomial.constant(Rational.of(j == i || j == i + 1 ? 1 : 0)));
+                (i, j) -> Polynomial.constant(Rational.of(j.equals(i) || j == i + 1 ? 1 : 0)));
         var inverse = ALG.matrix(n, n,
                 (i, j) -> Polynomial.constant(Rational.of(j < i ? 0 : (j - i) % 2 == 0 ? 1 : -1)));
         var spectrum = ALG.matrix(n, n,
@@ -225,9 +225,31 @@ class SpectralBatchRepairTest {
         var problem = new SpectralBatchRepair.Problem(source, basis, inverse, 2);
         var found = SpectralBatchRepair.discover(problem, new SpectralBatchRepair.Policy(List.of(), 0), 0,
                 LIMITS, () -> false).requireValue().operator();
+        assertEquals(PreparedSpectralBatch.Kind.DIRECT, found.kind());
+        assertEquals(new OperatorResidualPlans.Cost(22, 56), found.cost());
+        assertEquals(new OperatorResidualPlans.Cost(22, 70), found.spectralDirectCost());
+    }
+
+    @Test
+    void spectralDirectWinnerReconstructsFromItsCheckedZeroSyndromeCertificate() {
+        long[] upper = {-1, -1, 2, -1, 1, 1, 1};
+        int n = upper.length + 1;
+        var basis = ALG.matrix(n, n, (i, j) -> Polynomial.constant(Rational.of(
+                i.equals(j) ? 1 : j == i + 1 ? upper[i] : 0)));
+        var inverse = ALG.matrix(n, n, (i, j) -> {
+            long value = j < i ? 0 : 1;
+            for (int k = i; k < j; k++) value *= -upper[k];
+            return Polynomial.constant(Rational.of(value));
+        });
+        var spectrum = ALG.matrix(n, n,
+                (i, j) -> Polynomial.constant(Rational.of(i.equals(j) ? (i % 2 == 0 ? 1 : -1) : 0)));
+        var source = ALG.multiply(basis, ALG.multiply(spectrum, inverse));
+        var problem = new SpectralBatchRepair.Problem(source, basis, inverse, 2);
+        var found = SpectralBatchRepair.discover(problem, new SpectralBatchRepair.Policy(List.of(), 0), 0,
+                LIMITS, () -> false).requireValue().operator();
         assertEquals(PreparedSpectralBatch.Kind.SPECTRAL_DIRECT, found.kind());
-        assertEquals(new OperatorResidualPlans.Cost(40, 70), found.cost());
-        assertEquals(new OperatorResidualPlans.Cost(64, 56), found.directCost());
+        assertEquals(new OperatorResidualPlans.Cost(32, 70), found.cost());
+        assertEquals(new OperatorResidualPlans.Cost(48, 56), found.directCost());
         var reconstructed = SpectralBatchRepair.prepare(problem, found.certificate(), LIMITS, () -> false).requireValue();
         assertEquals(0, reconstructed.certificate().syndromeWidth());
         assertEquals(found.cost(), reconstructed.cost());

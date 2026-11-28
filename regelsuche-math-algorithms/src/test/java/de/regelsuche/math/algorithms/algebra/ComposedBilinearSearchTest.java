@@ -26,8 +26,8 @@ class ComposedBilinearSearchTest {
         assertEquals(VERIFIED, found.status(), found.detail());
         var discovery = found.requireValue();
         var prepared = discovery.prepared();
-        assertEquals(3 * 248, prepared.directCost().total());
-        assertEquals(3 * 54, prepared.cost().total());
+        assertEquals(3 * 152, prepared.directCost().total());
+        assertEquals(3 * 40, prepared.cost().total());
         assertEquals(24, prepared.cost().variableMultiplications());
         assertEquals(12, discovery.accounting().attemptedCandidates());
         assertTrue(discovery.accounting().suppliedSeed());

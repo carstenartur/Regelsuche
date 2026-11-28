@@ -4,7 +4,8 @@ import de.regelsuche.math.algorithms.iteration.IterationLimits;
 import de.regelsuche.math.algorithms.linalg.ExactMatrixExpression;
 import de.regelsuche.math.algorithms.linalg.SymbolicLinearSystem.PolynomialMatrix;
 import de.regelsuche.scalar.ExactRational;
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import static de.regelsuche.math.algorithms.algebra.OperatorResidualPlans.*;
@@ -32,8 +33,10 @@ public final class PreparedOperator {
                                     int rank, Cost directCost, OperatorChecks checks) {
         OperatorResidualPlans.verify(source, plan, checks);
         Node program = compile(plan.expression(), checks);
-        return new PreparedOperator(plan, predictor, rank, program,
-            directCost == null ? sparse(source, checks).cost() : directCost);
+        if (directCost == null) {
+            directCost = predictor == OperatorResidualSearch.Predictor.DIRECT ? program.cost() : sparse(source, checks).cost();
+        }
+        return new PreparedOperator(plan, predictor, rank, program, directCost);
     }
 
     public OperatorResidualSearch.Predictor predictor() { return predictor; }
@@ -69,26 +72,60 @@ public final class PreparedOperator {
         ExactRational[] apply(ExactRational[] input, OperatorChecks checks);
     }
 
-    private record Entry(int column, ExactRational coefficient) {}
+    private record Scaling(int column, ExactRational coefficient) {}
 
-    private record Sparse(int rows, int columns, List<List<Entry>> entries, Cost cost, boolean zero) implements Node {
+    /** Assigns one register per distinct scaling, and a value slot only on its second use. */
+    private static final class ScalingRegisters {
+        final LinkedHashMap<Scaling, Integer> indices = new LinkedHashMap<>();
+        final int[] slots;
+        int sharedCount;
+
+        ScalingRegisters(int maximumScalings) {
+            slots = new int[maximumScalings];
+            Arrays.fill(slots, -1);
+        }
+
+        int register(Scaling scaling) {
+            int next = indices.size();
+            Integer existing = indices.putIfAbsent(scaling, next);
+            if (existing == null) return next;
+            if (slots[existing] < 0) slots[existing] = sharedCount++;
+            return existing;
+        }
+    }
+
+    /** Registers below columns refer to inputs; higher registers refer to exact scaled inputs. */
+    private record Sparse(int columns, int[][] rowRegisters, List<Scaling> scalings, int[] slots,
+                          int sharedCount, Cost cost, boolean zero) implements Node {
+        @Override public int rows() { return rowRegisters.length; }
+
         @Override public ExactRational[] apply(ExactRational[] input, OperatorChecks checks) {
-            checks.reserve(rows, 1);
-            var output = new ExactRational[rows];
-            for (int row = 0; row < rows; row++) {
+            checks.reserveCells(sharedCount);
+            var shared = new ExactRational[sharedCount];
+            checks.reserve(rows(), 1);
+            var output = new ExactRational[rows()];
+            for (int row = 0; row < rows(); row++) {
                 checks.work.charge(1);
-                var sum = ExactRational.ZERO;
-                boolean first = true;
-                for (var entry : entries.get(row)) {
+                ExactRational sum = null;
+                for (int register : rowRegisters[row]) {
                     checks.work.charge(1);
-                    var term = entry.coefficient().equals(ExactRational.ONE) ? input[entry.column()]
-                        : checks.work.mul(entry.coefficient(), input[entry.column()]);
-                    sum = first ? term : checks.work.add(sum, term);
-                    first = false;
+                    var term = value(register, input, shared, checks);
+                    sum = sum == null ? term : checks.work.add(sum, term);
                 }
-                output[row] = sum;
+                output[row] = sum == null ? ExactRational.ZERO : sum;
             }
             return output;
+        }
+
+        private ExactRational value(int register, ExactRational[] input, ExactRational[] shared, OperatorChecks checks) {
+            if (register < columns) return input[register];
+            int index = register - columns;
+            int slot = slots[index];
+            if (slot >= 0 && shared[slot] != null) return shared[slot];
+            var scaling = scalings.get(index);
+            var product = checks.work.mul(scaling.coefficient(), input[scaling.column()]);
+            if (slot >= 0) shared[slot] = product;
+            return product;
         }
     }
 
@@ -147,27 +184,34 @@ public final class PreparedOperator {
 
     private static Sparse sparse(PolynomialMatrix matrix, OperatorChecks checks) {
         checks.reserve(matrix.rows(), 1);
-        // Mutable lists, immutable snapshots and each (column, rational) entry.
-        for (int part = 0; part < 4; part++) checks.reserve(matrix.rows(), matrix.columns());
-        var rows = new ArrayList<List<Entry>>(matrix.rows());
-        long multiplies = 0;
+        checks.reserve(1, matrix.columns());
+        // Row registers, scaling descriptors, insertion-ordered lookup and immutable scaling table.
+        checks.reserveCells(8L * matrix.rows() * matrix.columns());
+        var rows = new int[matrix.rows()][];
+        var rowBuffer = new int[matrix.columns()];
+        var scalings = new ScalingRegisters(matrix.rows() * matrix.columns());
         long additions = 0;
         boolean zero = true;
         for (int row = 0; row < matrix.rows(); row++) {
-            var entries = new ArrayList<Entry>();
+            int used = 0;
             for (int column = 0; column < matrix.columns(); column++) {
                 checks.work.charge(1);
                 var value = matrix.get(row, column);
                 if (value.isZero()) continue;
                 var rational = value.terms().values().iterator().next();
                 var coefficient = checks.work.check(new ExactRational(rational.numerator(), rational.denominator()));
-                entries.add(new Entry(column, coefficient));
-                if (!coefficient.equals(ExactRational.ONE)) multiplies++;
-                zero = false;
+                int register = column;
+                if (!coefficient.isOne()) {
+                    register = matrix.columns() + scalings.register(new Scaling(column, coefficient));
+                }
+                rowBuffer[used++] = register;
             }
-            additions += Math.max(0, entries.size() - 1);
-            rows.add(List.copyOf(entries));
+            additions += Math.max(0, used - 1);
+            rows[row] = Arrays.copyOf(rowBuffer, used);
+            if (used != 0) zero = false;
         }
-        return new Sparse(matrix.rows(), matrix.columns(), List.copyOf(rows), new Cost(multiplies, additions), zero);
+        int products = scalings.indices.size();
+        return new Sparse(matrix.columns(), rows, List.copyOf(scalings.indices.keySet()),
+            Arrays.copyOf(scalings.slots, products), scalings.sharedCount, new Cost(products, additions), zero);
     }
 }

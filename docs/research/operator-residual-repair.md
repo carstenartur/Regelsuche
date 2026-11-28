@@ -109,26 +109,30 @@ prüfen weiterhin Vektorform, Zahlenbreite, Arbeit, Speicher, Zeit und Abbruch.
 `correctionWidth()` ist bei automatisch ermittelten Faktoren der Residualrang,
 bei externen Faktoren lediglich eine Rangobergrenze.
 
-Der ausführbare Plan überspringt Nullkoeffizienten und Multiplikationen mit
-eins. **Dieselbe Optimierung gilt für die direkte Vergleichsmatrix.** Deshalb
-gewinnt eine Reparatur keinen künstlichen Vorteil gegenüber einer Diagonalmatrix.
-Ein statisch verschwindender Summand wird nicht ausgeführt. Die angegebenen
-Kosten zählen verbleibende rationale Multiplikationen und Additionen, ohne
-Laufzeit oder Bitkosten damit gleichzusetzen.
+Für jede Matrixanwendung berechnet der ausführbare Plan ein Produkt aus
+Eingabekoordinate und rationalem Koeffizienten einmal, auch wenn mehrere
+Ausgabezeilen es benötigen. Nullen entfallen, bei eins wird die Koordinate
+direkt gelesen. Die Zeilensummen behalten ihre Reihenfolge. Nur Produkte,
+die mehrere Zeilen verwenden, belegen zusätzliche Wertplätze während der
+Ausführung. Einmal benötigte Produkte fließen unmittelbar in die Zeilensumme
+ein. Alle Zwischenergebnisse gehören zur jeweiligen Vektoranwendung.
+**Kandidat und direkte Vergleichsmatrix verwenden denselben Mechanismus.**
+Die folgenden Zahlen zählen die ausgeführten rationalen Multiplikationen und
+Additionen.
 
 | Automatisch ausgewertete Quelle | Auswahl | Operationen pro Vektor | Direkte Quelle |
 | --- | --- | ---: | ---: |
 | Dichtes $I+uv^T$ aus dem obigen Vierdimensionenfall | Einheit mit Rang-eins-Korrektur | 14 | 28 |
-| Zentrierung $I-\frac18\mathbf1\mathbf1^T$ | Einheit mit Rang-eins-Korrektur | 23 | 120 |
-| Zentrierung $I-\frac1{16}\mathbf1\mathbf1^T$ | Einheit mit Rang-eins-Korrektur | 47 | 496 |
+| Zentrierung $I-\frac18\mathbf1\mathbf1^T$ | Einheit mit Rang-eins-Korrektur | 16 | 72 |
+| Zentrierung $I-\frac1{16}\mathbf1\mathbf1^T$ | Einheit mit Rang-eins-Korrektur | 32 | 272 |
 | $\operatorname{diag}(1,2,\ldots,8)$ | Direkt | 7 | 7 |
-| Feste dichte Zufallsmatrix der Ordnung acht | Direkt | 97 | 97 |
+| Feste dichte Zufallsmatrix der Ordnung acht | Direkt | 90 | 90 |
 
 Die Zentrierung ist ein wiederholter Verbraucher: unterschiedliche rationale
 Messvektoren verwenden denselben entdeckten Plan. Tests vergleichen weitere
 rechteckige und quadratische Quellen mit einer separaten direkten Berechnung.
 Das [Messprotokoll](../../research/benchmarks/operator-residual-search/README.md)
-enthält zusätzlich Suchkosten, wiederholte Anwendungen, Allokationen, eine
+dokumentiert für den dort fixierten früheren Quellstand Suchkosten, wiederholte Anwendungen, Allokationen, eine
 ungeprüfte dünn besetzte Direktrechnung und die handgeschriebene Mittelwertformel
 als stärkere fachliche Kontrolle. Die Messung ist eine lokale Beobachtung mit
 getrennten JVM-Prozessen und Aufwärmphase; sie ist kein allgemeiner
