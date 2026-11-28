@@ -1,0 +1,107 @@
+diff --git a/regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaMatcherPlan.java b/regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaMatcherPlan.java
+index 1b9dda8..57e6acc 100644
+--- a/regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaMatcherPlan.java
++++ b/regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaMatcherPlan.java
+@@ -39,7 +39,7 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
+     public static final String WORK_REVISION = "regelsuche.checked-schema-cursor-work/v2-prepaid-phases";
+     public static final String INDEXED_REVISION = "regelsuche.checked-schema-matcher-plan/v2-indexed";
+     public static final String INDEXED_WORK_REVISION = "regelsuche.checked-schema-cursor-work/v3-indexed-shared-paths";
+-    public static final String SELECTED_WORK_REVISION = "regelsuche.checked-schema-cursor-work/v4-bounded-site-selection";
++    public static final String SELECTED_WORK_REVISION = "regelsuche.checked-schema-cursor-work/v5-grandchild-probe-trial";
+     private static final int OTHER_SHAPE = 3;
+     private static final int BINARY_SHAPE_BASE = 4;
+     private static final int SHAPE_COUNT = BINARY_SHAPE_BASE + BinaryOperator.values().length;
+@@ -227,7 +227,16 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
+     long selectedMask(Expr expression, Work work) {
+         if (!(expression instanceof BinaryExpr binary)) return selector().leafMask;
+         work.add(3); // Two child shapes and one table lookup.
+-        return selector().childMasks[shape(binary)][shape(binary.left()) * SHAPE_COUNT + shape(binary.right())];
++        var selected = selector();
++        int root = shape(binary);
++        long mask = selected.childMasks[root][shape(binary.left()) * SHAPE_COUNT + shape(binary.right())];
++        work.add(3); // Retrieve mandatory rows, intersect and test for any live guarded row.
++        if ((mask & selected.guarded[root]) == 0) return mask;
++        work.add(8); // Read position, choose and read two edges, classify, index and intersect.
++        int at = selected.positions[root];
++        var parent = (BinaryExpr) (at < 2 ? binary.left() : binary.right());
++        var target = (at & 1) == 0 ? parent.left() : parent.right();
++        return mask & selected.guards[root][shape(target)];
+     }
+
+     /** Each bit is an original bucket position, including its wildcard suffix and selection cap. */
+@@ -235,10 +244,14 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
+         private final Map<String, List<CheckedSchemaMatcherPlan.Entry>> buckets;
+         final Range[] ranges = new Range[SHAPE_COUNT];
+         final long[][] childMasks = new long[SHAPE_COUNT][];
++        final long[] guarded = new long[SHAPE_COUNT];
++        final int[] positions = new int[SHAPE_COUNT];
++        final long[][] guards = new long[SHAPE_COUNT][];
+         final long leafMask;
+         final int minimumNodes;
+         SiteSelector(Map<String, List<CheckedSchemaMatcherPlan.Entry>> index, int cap, Work work, Work visits) {
+             buckets = index;
++            work.add(3L * SHAPE_COUNT + 3);
+             var wildcards = index.getOrDefault("P", List.of());
+             var leaves = new Range(index.getOrDefault("LEAF", List.of()), wildcards);
+             leafMask = CheckedSchemaShapeIndex.prefix(Math.min(cap, leaves.size()));
+@@ -252,6 +265,7 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
+                 if (bucket.size() == 0) continue;
+                 ranges[root] = bucket;
+                 if (bucket.size() > cap) minimum = 1; // Preserve observed incomplete prefixes.
++                prepareGuard(root, bucket, cap, work, visits);
+                 var masks = childMasks[root] = new long[SHAPE_COUNT * SHAPE_COUNT];
+                 work.add(masks.length);
+                 for (int row = 0; row < Math.min(cap, bucket.size()); row++) {
+@@ -280,11 +294,51 @@ public final class CheckedSchemaMatcherPlan implements RetainedGraph.View {
+             }
+             minimumNodes = minimum;
+         }
++        private void prepareGuard(int root, Range bucket, int cap, Work work, Work visits) {
++            int rows = Math.min(cap, bucket.size());
++            int[] frequencies = new int[4];
++            var values = new int[4][rows];
++            work.add(8L + 4L * rows);
++            for (int row = 0; row < rows; row++) {
++                var source = bucket.get(row).schema().source();
++                work.add(3); visits.add(1);
++                if (!(source instanceof PatternExpr.Operation binary)) continue;
++                for (int at = 0; at < 4; at++) {
++                    var child = at < 2 ? binary.left() : binary.right();
++                    work.add(4); visits.add(1);
++                    if (!(child instanceof PatternExpr.Operation parent)) continue;
++                    var grandchild = (at & 1) == 0 ? parent.left() : parent.right();
++                    work.add(4); visits.add(1);
++                    if (grandchild instanceof PatternExpr.Operation op) {
++                        values[at][row] = BINARY_SHAPE_BASE + op.operator().ordinal();
++                        frequencies[at]++;
++                        work.add(4);
++                    }
++                }
++            }
++            int at = 0;
++            for (int i = 1; i < 4; i++) if (frequencies[i] > frequencies[at]) at = i;
++            work.add(11);
++            if (frequencies[at] == 0) return;
++            positions[root] = at;
++            var accepted = guards[root] = new long[SHAPE_COUNT];
++            work.add(SHAPE_COUNT + 3);
++            long wildcards = 0;
++            for (int row = 0; row < rows; row++) {
++                int required = values[at][row];
++                long bit = 1L << row;
++                work.add(4);
++                if (required == 0) wildcards |= bit;
++                else { guarded[root] |= bit; accepted[required] |= bit; work.add(3); }
++            }
++            for (int i = 0; i < accepted.length; i++) accepted[i] |= wildcards;
++            work.add(2L * accepted.length);
++        }
+         @Override public Set<Map.Entry<String, List<CheckedSchemaMatcherPlan.Entry>>> entrySet() { return buckets.entrySet(); }
+         @Override public List<CheckedSchemaMatcherPlan.Entry> get(Object key) { return buckets.get(key); }
+         @Override public void retainedReferences(RetainedGraph.Visitor v) {
+-            v.reference(buckets); v.reference(ranges); v.reference(childMasks);
++            v.reference(buckets); v.reference(ranges); v.reference(childMasks); v.reference(positions); v.reference(guards); v.reference(guarded);
+         }
+     }
+
+     private static final class IndexedEntries extends AbstractList<Entry> implements RetainedGraph.View {

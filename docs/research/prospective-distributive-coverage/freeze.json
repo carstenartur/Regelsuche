@@ -1,0 +1,51 @@
+{
+  "protocol" : "sha256:8a36e7ce282f64de7406f3a58462b58345344b8091dec8399a0a7f9696cbb8ad",
+  "inventory" : "sha256:1aac0f47aa0c28953ca4424741a62a84fb7a6234d684e2230b0dd0a8fc75d733",
+  "modelSnapshot" : "sha256:9e56f3640b85520b8b4090f64aa96c14bb703d3d218ab6fd60c2cdb47e74e223",
+  "decision" : "PROMOTED",
+  "schemas" : 7,
+  "acquisition" : {
+    "lessons" : 448,
+    "formation" : 4452,
+    "preparation" : 1153,
+    "validation" : 2497,
+    "selection" : 36,
+    "restoration" : 0,
+    "splitChecking" : 544
+  },
+  "training" : [ {
+    "source" : "a * (b - c - d) + a * d + a * c",
+    "solved" : true,
+    "output" : "a * b",
+    "work" : 206,
+    "primitiveRules" : [ "evo_3601297f9f7d_factor-left", "evo_3601297f9f7d_cancel-addend", "evo_3601297f9f7d_factor-left", "evo_3601297f9f7d_cancel-addend" ]
+  }, {
+    "source" : "(e + f) * (g - h - i) + (e + f) * i + (e + f) * h",
+    "solved" : true,
+    "output" : "(e + f) * g",
+    "work" : 242,
+    "primitiveRules" : [ "evo_3601297f9f7d_factor-left", "evo_3601297f9f7d_cancel-addend", "evo_3601297f9f7d_factor-left", "evo_3601297f9f7d_cancel-addend" ]
+  } ],
+  "gate" : [ {
+    "source" : "r * (3 - s - t) + r * t + r * s",
+    "baseline" : 217,
+    "candidate" : 168,
+    "routed" : 168,
+    "baselineSolved" : true,
+    "candidateSolved" : true
+  }, {
+    "source" : "(x - 7) * (y - z - w) + (x - 7) * w + (x - 7) * z",
+    "baseline" : 253,
+    "candidate" : 218,
+    "routed" : 218,
+    "baselineSolved" : true,
+    "candidateSolved" : true
+  }, {
+    "source" : "p * (q + 11 - u - v) + p * v + p * u",
+    "baseline" : 211,
+    "candidate" : 198,
+    "routed" : 198,
+    "baselineSolved" : false,
+    "candidateSolved" : true
+  } ]
+}

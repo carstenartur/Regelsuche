@@ -1,0 +1,38 @@
+diff --git a/regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaCursor.java b/regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaCursor.java
+index e2f8a64..3169876 100644
+--- a/regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaCursor.java
++++ b/regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaCursor.java
+@@ -269,6 +269,8 @@ class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View {
+         }
+         if (relevant.size() > plan.maximumSchemasPerOccurrence()) complete = false;
+     }
++    static final ThreadLocal<Boolean> REFERENCE_DIAGNOSTIC = ThreadLocal.withInitial(() -> false);
++
+     private void match() {
+         meter.charge(Operation.MATCH, 1);
+         if (attempted >= plan.bounds().maximumMatchAttempts() || produced >= plan.bounds().maximumCandidates()) {
+@@ -284,6 +286,10 @@ class CheckedSchemaCursor<T> implements ObjectSource<T>,RetainedGraph.View {
+         // Existing exact matcher is bounded but atomic. A completed match is retained across pulls.
+         var outcome = entry.matcher().match(occurrence.expression(), new ExprMatcher.MatchOptions(
+             null, 1, plan.bounds().maximumExpressionNodes() * 4, plan.bounds().maximumExpressionNodes() * 4));
++        if (REFERENCE_DIAGNOSTIC.get() && plan.selectsSites()) {
++            System.out.println("DISPATCH_MATCH " + outcome.matched() + " "
++                + ((long) outcome.evaluatedSteps() + outcome.patternBranches()));
++        }
+         meter.charge(Operation.MATCH, (long) outcome.evaluatedSteps() + outcome.patternBranches());
+         if (!outcome.complete()) complete = false;
+         if (outcome.matched()) {
+diff --git a/regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaTaskSolver.java b/regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaTaskSolver.java
+index 85a664b..61b8dca 100644
+--- a/regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaTaskSolver.java
++++ b/regelsuche-learning/src/main/java/de/regelsuche/evolution/CheckedSchemaTaskSolver.java
+@@ -208,6 +208,9 @@ public final class CheckedSchemaTaskSolver {
+
+     /** Fresh cursors, scoped codec reuse, one budget, and final replay for every invocation. */
+     public Solution solve(Task task) {
++        boolean observe = task.budget().totalWork() == 200_000;
++        CheckedSchemaCursor.REFERENCE_DIAGNOSTIC.set(observe);
++        if (observe) System.out.println("DISPATCH_CASE " + de.regelsuche.parse.ExpressionFormatter.format(task.source()));
+         var prepared = prepare(task);
+         var result = CompiledAstReplayCodec.withExpressionCache(CODEC_ENTRIES, CODEC_CHARACTERS,
+             () -> new TypedSourceOnlySearch().searchUntil(problem(task), prepared.objective(),
