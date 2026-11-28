@@ -1,0 +1,224 @@
+{
+  "implementation": "d19d83d7719111b23693de9e54d6efa1e707b3b8",
+  "focusedControls": "d61294eeaafc25e5836880b910fcdf59b966ec7a",
+  "freezeSha256": "e08c31e2002624414e2daa827859c2ff1188b4886a2362eac798a1f5ef1fbc02",
+  "freshTrainCompared": [
+    "freeze.json",
+    "local.json",
+    "whole.json"
+  ],
+  "pairsCompared": 432,
+  "timingOrder": [
+    "elapsedNanos",
+    "threadCpuNanos"
+  ],
+  "runs": [
+    {
+      "rotation": 0,
+      "rawOutputSha256": "ff5c7d73dcfefac9198fba32cbfa4a4a64dc96813927be1eb34ebeabffa2df44",
+      "checkedPairs": 144,
+      "timings": {
+        "BASE": [
+          319096826,
+          289020411
+        ],
+        "ORDER": [
+          89494876,
+          81116333
+        ],
+        "LOCAL": [
+          241464741,
+          209186282
+        ],
+        "DROP": [
+          91152022,
+          71651509
+        ],
+        "WHOLE": [
+          61760043,
+          53602122
+        ],
+        "HAND": [
+          430957828,
+          362832154
+        ]
+      }
+    },
+    {
+      "rotation": 1,
+      "rawOutputSha256": "cacf82cf2c940a9befd0968eb043a8b35377c18d7264f89ad514e29ed3602316",
+      "checkedPairs": 144,
+      "timings": {
+        "LOCAL": [
+          509925580,
+          455779798
+        ],
+        "DROP": [
+          126895817,
+          120601599
+        ],
+        "WHOLE": [
+          78747620,
+          77417442
+        ],
+        "HAND": [
+          241728088,
+          182613430
+        ],
+        "BASE": [
+          115417704,
+          92444252
+        ],
+        "ORDER": [
+          93818465,
+          67582827
+        ]
+      }
+    },
+    {
+      "rotation": 2,
+      "rawOutputSha256": "465b96e42b72e65c57e15ff171bbf0cb77401f3be7efe50d1cac9a18863195c9",
+      "checkedPairs": 144,
+      "timings": {
+        "WHOLE": [
+          322073505,
+          291805275
+        ],
+        "HAND": [
+          191283972,
+          180135627
+        ],
+        "BASE": [
+          72272102,
+          69719758
+        ],
+        "ORDER": [
+          92754080,
+          53928995
+        ],
+        "LOCAL": [
+          238000260,
+          191826573
+        ],
+        "DROP": [
+          119392292,
+          94007002
+        ]
+      }
+    }
+  ],
+  "verifiedSchemaUsesPerReplicate": [
+    {
+      "family": "two-site-energy",
+      "n": 2,
+      "stepIndex": 0,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "two-site-energy",
+      "n": 2,
+      "stepIndex": 1,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "squared-compensated-product",
+      "n": 2,
+      "stepIndex": 0,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "rational-quotient",
+      "n": 2,
+      "stepIndex": 0,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "two-site-energy",
+      "n": 3,
+      "stepIndex": 0,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "two-site-energy",
+      "n": 3,
+      "stepIndex": 1,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "squared-compensated-product",
+      "n": 3,
+      "stepIndex": 0,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "rational-quotient",
+      "n": 3,
+      "stepIndex": 0,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "two-site-energy",
+      "n": 5,
+      "stepIndex": 0,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "two-site-energy",
+      "n": 5,
+      "stepIndex": 1,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "squared-compensated-product",
+      "n": 5,
+      "stepIndex": 0,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "rational-quotient",
+      "n": 5,
+      "stepIndex": 0,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "two-site-energy",
+      "n": 7,
+      "stepIndex": 0,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "two-site-energy",
+      "n": 7,
+      "stepIndex": 1,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "squared-compensated-product",
+      "n": 7,
+      "stepIndex": 0,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    },
+    {
+      "family": "rational-quotient",
+      "n": 7,
+      "stepIndex": 0,
+      "arm": "LOCAL",
+      "schemaId": "checked-schema:sha256:14cbff69223f06324f0f7155e7e6d6e4e8d54270f4ab24c81a04fe37929a0b4d"
+    }
+  ]
+}
