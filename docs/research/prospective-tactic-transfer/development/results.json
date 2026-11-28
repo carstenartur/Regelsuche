@@ -1,0 +1,229 @@
+{
+  "mixed": {
+    "BOTH": {
+      "onlineVerification": 120558,
+      "terminalReplay": 120558,
+      "summary": {
+        "acquisition": 141257,
+        "load": 1620,
+        "preparation": 7639,
+        "checkpoints": [
+          {
+            "budget": 524288,
+            "completed": 510,
+            "solved": 510
+          }
+        ],
+        "totalSolved": 1024,
+        "fullCost": 899596
+      },
+      "learnedSteps": 1536,
+      "polynomialAudit": 173258,
+      "ledgerSha256": "db21f0a08218eddffac7fb57bcccc5c408edfa03cd640452242982ce449d4e37",
+      "query": 455264
+    },
+    "CHECKER": {
+      "onlineVerification": 120558,
+      "terminalReplay": 120558,
+      "summary": {
+        "acquisition": 9130,
+        "load": 1620,
+        "preparation": 2118,
+        "checkpoints": [
+          {
+            "budget": 524288,
+            "completed": 720,
+            "solved": 720
+          }
+        ],
+        "totalSolved": 1024,
+        "fullCost": 738848
+      },
+      "learnedSteps": 1536,
+      "polynomialAudit": 173258,
+      "ledgerSha256": "569cbdd1d7fc3fcb5e3df653f8a2f31794ebe6116f74ca36de5e4b8133e2c001",
+      "query": 432164
+    },
+    "ORIGINAL": {
+      "onlineVerification": 127208,
+      "terminalReplay": 127208,
+      "summary": {
+        "acquisition": 9130,
+        "load": 1620,
+        "preparation": 2100,
+        "checkpoints": [
+          {
+            "budget": 524288,
+            "completed": 708,
+            "solved": 708
+          }
+        ],
+        "totalSolved": 1024,
+        "fullCost": 752130
+      },
+      "learnedSteps": 1536,
+      "polynomialAudit": 173258,
+      "ledgerSha256": "9ef0093623a54e361544a392528f265b5ec72c7bfd1caa42ae3f65fe1d57a3d8",
+      "query": 438814
+    },
+    "POLICY": {
+      "onlineVerification": 127208,
+      "terminalReplay": 127208,
+      "summary": {
+        "acquisition": 141257,
+        "load": 1620,
+        "preparation": 7621,
+        "checkpoints": [
+          {
+            "budget": 524288,
+            "completed": 502,
+            "solved": 502
+          }
+        ],
+        "totalSolved": 1024,
+        "fullCost": 912878
+      },
+      "learnedSteps": 1536,
+      "polynomialAudit": 173258,
+      "ledgerSha256": "3a3020c8c5536e7a873e77371c5dcc989d848b162f688d2e997f5f9505a6cab1",
+      "query": 461914
+    },
+    "commonSetup": 150516,
+    "completedWithCommonSetup": {
+      "BOTH": 510,
+      "CHECKER": 527,
+      "ORIGINAL": 517,
+      "POLICY": 502
+    }
+  },
+  "replayByDepthCountAndWork": {
+    "new": {
+      "1": [
+        254,
+        16764
+      ],
+      "2": [
+        252,
+        17388
+      ],
+      "3": [
+        776,
+        63028
+      ],
+      "4": [
+        254,
+        22610
+      ]
+    },
+    "old": {
+      "1": [
+        254,
+        14986
+      ],
+      "2": [
+        252,
+        16380
+      ],
+      "3": [
+        776,
+        68904
+      ],
+      "4": [
+        254,
+        26170
+      ]
+    }
+  },
+  "elapsedNanosByRotation": [
+    {
+      "BOTH_setup": 285052572,
+      "BOTH_total": 2700125909,
+      "CHECKER_setup": 5427767,
+      "CHECKER_total": 2136626096,
+      "ORIGINAL_setup": 3687536,
+      "ORIGINAL_total": 2408136605,
+      "POLICY_setup": 212836302,
+      "POLICY_total": 2064705016
+    },
+    {
+      "BOTH_setup": 158470966,
+      "BOTH_total": 1663421439,
+      "CHECKER_setup": 3527725,
+      "CHECKER_total": 2060432485,
+      "ORIGINAL_setup": 3665623,
+      "ORIGINAL_total": 1719950453,
+      "POLICY_setup": 278839837,
+      "POLICY_total": 2235017068
+    },
+    {
+      "BOTH_setup": 253261141,
+      "BOTH_total": 2135859683,
+      "CHECKER_setup": 2676983,
+      "CHECKER_total": 1646956862,
+      "ORIGINAL_setup": 2415629,
+      "ORIGINAL_total": 1694282940,
+      "POLICY_setup": 438652522,
+      "POLICY_total": 2916752403
+    },
+    {
+      "BOTH_setup": 284697355,
+      "BOTH_total": 2702990051,
+      "CHECKER_setup": 2612777,
+      "CHECKER_total": 1714846960,
+      "ORIGINAL_setup": 3761768,
+      "ORIGINAL_total": 1843862986,
+      "POLICY_setup": 185927040,
+      "POLICY_total": 1764800659
+    }
+  ],
+  "isolatedReplayNanosByRotation": [
+    {
+      "new": [
+        470328087,
+        369449117,
+        526879275
+      ],
+      "old": [
+        1284810746,
+        370783488,
+        375411986
+      ]
+    },
+    {
+      "new": [
+        474381563,
+        422572100,
+        436205249
+      ],
+      "old": [
+        416308428,
+        485801099,
+        506035428
+      ]
+    },
+    {
+      "new": [
+        454827277,
+        429285046,
+        510364281
+      ],
+      "old": [
+        496618368,
+        407009301,
+        480838169
+      ]
+    },
+    {
+      "new": [
+        409605742,
+        395846443,
+        384396778
+      ],
+      "old": [
+        443746378,
+        482430158,
+        390911188
+      ]
+    }
+  ]
+}

@@ -269,6 +269,17 @@ der optimierte Lernsolver **678**. Alle fünf Varianten lieferten für jede
 Rechtecksumme denselben Beweis aus primitiven Faktorisierungsschritten.
 [Transferstudie und beide Vergleichsrechnungen](docs/research/prospective-interval-transfer/README.md)
 
+Mit günstigerer unabhängiger Beweisprüfung und denselben sieben Lernregeln
+stieg die Zahl der rechtzeitigen Lösungen auf dem Horner-/Skalarproduktstrom
+von **708 auf 720**. Beim Abschalten der Lernregeln sank sie auf **698**.
+Über alle 1.024 Aufgaben sparten die Regeln 21.948 Arbeitseinheiten. Eine neu
+trainierte Regelwahl erreichte **510** rechtzeitige Lösungen.
+Bei zwei weiteren, vorab festgelegten Familien löste sie **256 von 512**
+Interpolationen und **192 von 512** Kreisidentitäten. Die primitive Suche
+erreichte **352** und **320**. In keiner der neuen Beweisketten kam eine der
+sechs frisch erlernten Taktiken zum Einsatz.
+[Versuch, Einzelbeispiele und unabhängige Prüfung](docs/research/prospective-tactic-transfer/README.md)
+
 Der qualifizierte autonome Walkthrough bildet aus targetfreien Beobachtungen
 einen parametrisierten Kandidaten, trennt Kandidatenbildung und Prüfung und
 misst anschließend die Wiederverwendung auf zurückgehaltenen Aufgaben. Im hier
