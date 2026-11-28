@@ -413,6 +413,72 @@ class Z3EqualityProofReplayTest {
             contradiction("(rewrite (= (* 2.0 x) x))", "(= (* 2.0 x) x)")));
     }
 
+    @Test
+    void replaysNativeAffineNonStrictOrder() {
+        // Genuine Z3 4.13.3.0 proof: 2*x <= 2 implies x <= 1.
+        String proof = """
+            ((set-logic ALL)
+            (proof
+            (let (($x39 (<= x 1.0)))
+            (let (($x50 (not $x39)))
+            (let ((@x52 (mp (asserted (not (<= x (to_real 1)))) (rewrite (= (not (<= x (to_real 1))) $x50)) $x50)))
+            (let ((?x32 (* 2.0 x)))
+            (let (($x34 (<= ?x32 2.0)))
+            (let ((?x25 (to_real 2)))
+            (let ((?x26 (* ?x25 x)))
+            (let (($x27 (<= ?x26 ?x25)))
+            (let ((@x31 (rewrite (= ?x25 2.0))))
+            (let ((@x43 (trans (monotonicity (rewrite (= ?x26 ?x32)) @x31 (= $x27 $x34)) (rewrite (= $x34 $x39)) (= $x27 $x39))))
+            (let ((@x44 (mp (asserted $x27) @x43 $x39)))
+            (unit-resolution @x44 @x52 false))))))))))))))
+            """;
+        var valid = orderStatement("x", "1", "2*x = 2", SolverIr.Relation.LESS_OR_EQUAL);
+        assertTrue(Z3EqualityProofReplay.verifies(valid, proof));
+        var wrongGoal = orderStatement("x", "1", "2*x = 2", SolverIr.Relation.GREATER_OR_EQUAL);
+        assertFalse(Z3EqualityProofReplay.verifies(wrongGoal, proof));
+        assertFalse(Z3EqualityProofReplay.verifies(valid, proof.replace("2.0 x", "3.0 x")));
+    }
+
+    @Test
+    void admitsOnlyPositiveOrderRescaling() {
+        String target = "(<= x 0.0)";
+        assertTrue(Z3EqualityProofReplay.verifies(
+            orderStatement("x", "0", "2*x = 0", SolverIr.Relation.LESS_OR_EQUAL),
+            equationRewrite("(<= (* 2.0 x) 0.0)", target)));
+        assertFalse(Z3EqualityProofReplay.verifies(
+            orderStatement("x", "0", "-2*x = 0", SolverIr.Relation.LESS_OR_EQUAL),
+            equationRewrite("(<= (* (- 2.0) x) 0.0)", target)));
+        assertFalse(Z3EqualityProofReplay.verifies(
+            orderStatement("x", "0", "0*x = 0", SolverIr.Relation.LESS_OR_EQUAL),
+            equationRewrite("(<= (* 0.0 x) 0.0)", target)));
+        assertFalse(Z3EqualityProofReplay.verifies(
+            orderStatement("x", "0", "x*y = 0", SolverIr.Relation.LESS_OR_EQUAL),
+            equationRewrite("(<= (* x y) 0.0)", target)));
+        assertFalse(Z3EqualityProofReplay.verifies(
+            orderStatement("x", "0", "2*x = 0", SolverIr.Relation.GREATER_OR_EQUAL),
+            equationRewrite("(<= (* 2.0 x) 0.0)", "(>= x 0.0)")));
+    }
+
+    @Test
+    void normalizesGreaterOrEqualWithoutReversingTheOrder() {
+        var valid = orderStatement("x", "0", "0 = 2*x", SolverIr.Relation.GREATER_OR_EQUAL);
+        assertTrue(Z3EqualityProofReplay.verifies(valid,
+            equationRewrite("(<= 0.0 (* 2.0 x))", "(>= x 0.0)")));
+        assertFalse(Z3EqualityProofReplay.verifies(valid,
+            equationRewrite("(<= 0.0 (* 2.0 x))", "(<= x 0.0)")));
+    }
+
+    private static Obligation orderStatement(String left, String right, String premise,
+                                              SolverIr.Relation goalRelation) {
+        var template = statement(left, right, premise);
+        var source = template.assumptions().getFirst();
+        var predicate = new SolverIr.Predicate(source.id(), SolverIr.Relation.LESS_OR_EQUAL,
+            source.left(), source.right());
+        var goal = new SolverIr.Goal(goalRelation, template.goal().left(), template.goal().right());
+        return Obligation.create(template.obligationId(), template.declarations(), template.theories(),
+            List.of(predicate), goal, template.requestedEvidence(), template.provenance());
+    }
+
     private static String equationRewrite(String source, String target) {
         return contradiction("(mp (asserted " + source + ") (rewrite (= " + source + " "
             + target + ")) " + target + ")", target);

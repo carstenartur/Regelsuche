@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/** Checks bounded native equality/ring proofs without invoking an external solver. */
+/** Checks bounded native equality and non-strict real-order proofs without an external solver. */
 public final class Z3EqualityProofReplay {
     static final int MAX_BYTES = 131_072;
     private Z3EqualityProofReplay() { }
@@ -31,10 +31,10 @@ public final class Z3EqualityProofReplay {
         try {
             var checker = new Checker(obligation);
             for (var premise : obligation.assumptions()) {
-                checker.addAssertion(checker.equality(premise.relation(), premise.left(), premise.right()));
+                checker.addAssertion(checker.relation(premise.relation(), premise.left(), premise.right()));
             }
             var goal = obligation.goal();
-            checker.addAssertion(checker.values.negate(checker.equality(goal.relation(), goal.left(), goal.right())));
+            checker.addAssertion(checker.values.negate(checker.relation(goal.relation(), goal.left(), goal.right())));
             return checker.check(Z3ProofSyntax.parse(object));
         } catch (Invalid | IllegalArgumentException | ArithmeticException unsupported) {
             return false;
@@ -55,10 +55,15 @@ public final class Z3EqualityProofReplay {
             rewrites = new Z3PolynomialProofRewrites(obligation, values);
         }
 
-        Equality equality(Relation relation, de.regelsuche.solver.ir.SolverIr.Expression left,
-                          de.regelsuche.solver.ir.SolverIr.Expression right) {
-            if (relation != Relation.EQUALS) throw new Invalid();
-            return values.equality(values.expression(left), values.expression(right));
+        Formula relation(Relation relation, de.regelsuche.solver.ir.SolverIr.Expression left,
+                         de.regelsuche.solver.ir.SolverIr.Expression right) {
+            Real a = values.expression(left), b = values.expression(right);
+            return switch (relation) {
+                case EQUALS -> values.equality(a, b);
+                case LESS_OR_EQUAL -> values.order(a, b);
+                case GREATER_OR_EQUAL -> values.order(b, a);
+                default -> throw new Invalid();
+            };
         }
 
         void addAssertion(Formula assertion) {
