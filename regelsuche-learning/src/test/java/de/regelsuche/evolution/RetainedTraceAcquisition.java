@@ -91,7 +91,9 @@ final class RetainedTraceAcquisition {
                 referenceWork = Math.addExact(referenceWork,solved.evidence().totalWork());
                 references.add(proof(solved.evidence(),solved.solved(),solved.evidence().totalWork()));
                 int depth = solved.solved() ? Math.max(1,solved.evidence().witness().size()-1) : 32;
-                gates.add(task(row,depth,8192));
+                // Ask for a shorter proof within the price of the primitive solution we just measured.
+                long cap = solved.solved() ? Math.clamp(solved.evidence().totalWork(),1L,8192L) : 8192L;
+                gates.add(task(row,depth,cap));
             }
         }
         var update = CumulativeTaskKnowledge.empty(INVENTORY).learnLocalBatch(lessons,gates,1_000_000);
@@ -107,15 +109,16 @@ final class RetainedTraceAcquisition {
             training.add(row);
         }
         var validation = new ArrayList<Map<String,Object>>();
-        for (int i=0;i<update.validation().size();i++) {
-            var v=update.validation().get(i);
+        for (int i=0;i<gates.size();i++) {
+            var v=i < update.validation().size() ? update.validation().get(i) : null;
             var row=taskReceipt(prefix.rows().get(i+3));
             row.put("depth",gates.get(i).budget().maxSearchDepth());
+            row.put("cap",gates.get(i).budget().totalWork());
             row.put("reference",references.get(i));
-            row.put("base",v.baseline().totalWork());
-            row.put("previous",v.previous().totalWork());
-            row.put("candidate",v.candidate().totalWork());
-            row.put("routed",v.automatic().map(CumulativeTaskKnowledge.Execution::totalWork).orElse(0L));
+            row.put("base",v == null ? 0L : v.baseline().totalWork());
+            row.put("previous",v == null ? 0L : v.previous().totalWork());
+            row.put("candidate",v == null ? 0L : v.candidate().totalWork());
+            row.put("routed",v == null ? 0L : v.automatic().map(CumulativeTaskKnowledge.Execution::totalWork).orElse(0L));
             validation.add(row);
         }
         var receipt = new TreeMap<String,Object>();
