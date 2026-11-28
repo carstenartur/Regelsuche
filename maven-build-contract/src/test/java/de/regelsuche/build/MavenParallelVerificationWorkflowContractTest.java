@@ -606,6 +606,10 @@ class MavenParallelVerificationWorkflowContractTest {
     int qualify = commands.indexOf("#qualifyConfiguredArchive");
     assertTrue(stage >= 0 && packageArchive > stage && qualify > packageArchive);
     assertTrue(commands.substring(stage, packageArchive).contains("-DskipTests clean install"));
+    int seed = commands.indexOf("java \"$source_path/StudentSdkStageCache.java\" \"$HOME/.m2/repository\" \"$repository\"");
+    assertTrue(seed >= 0 && seed < stage, "only external cached dependencies may seed the fresh stage before install");
+    assertTrue(commands.substring(stage, packageArchive).contains("\"-Dmaven.repo.local=$repository\""));
+    assertTrue(commands.contains("tee \"$evidence/stage-cache.log\""));
     assertTrue(commands.contains("work=$(mktemp -d \"$RUNNER_TEMP/student-sdk-archive/work.XXXXXXXX\")"));
     assertTrue(commands.contains("-Dregelsuche.studentSdk.qualify=true"));
     assertFalse(commands.contains("git tag") || commands.contains("gh release") || commands.contains("git push"));
