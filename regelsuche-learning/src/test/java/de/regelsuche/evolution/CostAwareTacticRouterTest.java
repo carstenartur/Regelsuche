@@ -35,6 +35,26 @@ class CostAwareTacticRouterTest {
         assertTrue(found.evidence().replayWork() > 0);
         assertEquals(held.budget().totalWork(),found.evidence().workBudget() + found.selectionWork());
 
+        var sparse = CostAwareTacticRouter.fitSparse(genome,model,List.of(first,second,ordinary));
+        assertEquals(fit.trials(),sparse.trials());
+        assertTrue(sparse.admission().sparse());
+        assertFalse(sparse.admission().selectedSchemas().isEmpty());
+        assertTrue(sparse.admission().selectedSchemas().size() < model.schemas().size());
+        var allowed = Set.copyOf(sparse.admission().selectedSchemas());
+        assertEquals(allowed,sparse.sparseTrials().stream().filter(CostAwareTacticRouter.SparseTrial::compressedOrCheaper)
+            .flatMap(row -> row.pilotSchemas().stream()).collect(Collectors.toSet()));
+        assertEquals(CostAwareTacticRouter.Refinement.MEASURED,sparse.sparseTrials().getFirst().status());
+        assertEquals(CostAwareTacticRouter.Refinement.OUTSIDE_SUPPORT,sparse.sparseTrials().getLast().status());
+        assertTrue(sparse.sparseTrials().stream().allMatch(row -> allowed.containsAll(row.usedSchemas())));
+        long pairedWork = sparse.trials().stream().mapToLong(row -> row.primitiveWork() + row.learnedWork()).sum();
+        assertTrue(sparse.work() > pairedWork + sparse.sparseTrials().stream().mapToLong(CostAwareTacticRouter.SparseTrial::work).sum());
+        var sparseSolver = CostAwareTacticRouter.prepare(genome,model,sparse.admission(),Set.of());
+        var sparseFound = sparseSolver.solve(held);
+        assertTrue(sparseFound.solved());
+        var sparseDrop = CostAwareTacticRouter.prepare(genome,model,sparse.admission(),allowed);
+        assertEquals(sparseSolver.preparationWork(),sparseDrop.preparationWork());
+        assertFalse(sparseDrop.solve(held).solved());
+
         var ids = model.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id).collect(Collectors.toSet());
         var dropped = CostAwareTacticRouter.prepare(genome,model,fit.admission(),ids);
         var failed = dropped.solve(held);

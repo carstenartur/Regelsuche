@@ -76,7 +76,7 @@ class RetainedTacticStudyTest {
     }
 
     private static Library fitted(CheckedLearnedSchemaModel model, long acquisition, long load, List<CheckedSchemaTaskSolver.Task> tasks) {
-        return new Library(model, acquisition, load, CostAwareTacticRouter.fit(INVENTORY,model,tasks));
+        return new Library(model, acquisition, load, CostAwareTacticRouter.fitSparse(INVENTORY,model,tasks));
     }
 
     static Engine engine(Arm arm, Materials materials, Set<String> disabled) {
@@ -118,7 +118,8 @@ class RetainedTacticStudyTest {
         return new TreeMap<>(Map.of("model",library.model().identity(),"acquisition",library.acquisition(),"load",library.load(),
             "schemas",library.model().schemas().stream().map(s -> s.id()).sorted().toList(),"calibration",library.fit().work(),
             "admission",library.fit().admission().fingerprint(),"acceptedShapes",library.fit().admission().acceptedShapes(),
-            "trials",library.fit().trials()));
+            "trials",library.fit().trials(),"sparseTrials",library.fit().sparseTrials(),
+            "selectedSchemas",library.fit().admission().selectedSchemas()));
     }
 
     private static Map<String,Object> calibrationTask(CheckedSchemaTaskSolver.Task task) {
