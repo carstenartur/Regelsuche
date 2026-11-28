@@ -48,23 +48,32 @@ final class TaskSubpathMiner {
     /**
      * Follow only transitions with the same enclosing operator and exactly one changed
      * child. A step wholly in the sibling becomes a stutter; a change at the common
-     * ancestor forbids that projection. Keeping original indices binds interleaved work.
+     * ancestor ends a projection segment. Keeping original indices binds interleaved work.
      */
     private static void collectScopes(Trace trace, List<Trace> scopes, CheckedSchemaSupport.Work work) {
         var left = new ArrayList<Step>();
         var right = new ArrayList<Step>();
         for (var step : trace.steps()) {
             work.add(1);
-            if (!(step.before() instanceof BinaryExpr before) || !(step.after() instanceof BinaryExpr after)
-                    || before.operator() != after.operator()) return;
-            boolean sameLeft = before.left().equals(after.left());
-            boolean sameRight = before.right().equals(after.right());
-            if (sameLeft == sameRight) return;
-            if (sameLeft) right.add(step.project(before.right(), after.right()));
-            else left.add(step.project(before.left(), after.left()));
+            if (projectIndependentStep(step, left, right)) continue;
+            collectChild(trace.path() + "L", left, scopes, work);
+            collectChild(trace.path() + "R", right, scopes, work);
+            left = new ArrayList<>();
+            right = new ArrayList<>();
         }
         collectChild(trace.path() + "L", left, scopes, work);
         collectChild(trace.path() + "R", right, scopes, work);
+    }
+
+    private static boolean projectIndependentStep(Step step, List<Step> left, List<Step> right) {
+        if (!(step.before() instanceof BinaryExpr before) || !(step.after() instanceof BinaryExpr after)
+                || before.operator() != after.operator()) return false;
+        boolean sameLeft = before.left().equals(after.left());
+        boolean sameRight = before.right().equals(after.right());
+        if (sameLeft == sameRight) return false;
+        if (sameLeft) right.add(step.project(before.right(), after.right()));
+        else left.add(step.project(before.left(), after.left()));
+        return true;
     }
 
     private static void collectChild(String path, List<Step> steps, List<Trace> scopes, CheckedSchemaSupport.Work work) {

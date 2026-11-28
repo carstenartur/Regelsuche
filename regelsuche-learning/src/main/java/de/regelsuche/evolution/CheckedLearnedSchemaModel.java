@@ -230,10 +230,16 @@ public final class CheckedLearnedSchemaModel implements RetainedGraph.View {
                 String lineage = solution.evidence().witness().stream().map(step -> step.move().ruleId())
                     .collect(java.util.stream.Collectors.joining("\n"));
                 work.add(solution.evidence().witness().size());
-                observationId += "@" + SchematicProofPlan.hash(lineage);
+                String sourceKey = CODEC.encodeExpression(source);
+                String targetKey = CODEC.encodeExpression(target);
+                String observationBinding = lineage;
+                if (includeSubpaths) {
+                    observationBinding = parent.modelHash + "\n" + sourceKey + "\n" + targetKey + "\n" + lineage;
+                    work.add(observationBinding.length());
+                }
+                observationId += "@" + SchematicProofPlan.hash(observationBinding);
                 addPair(examples, seen, observationId, 0, solution.evidence().witness().size(), source, target, work);
-                provenance.append('\n').append(CODEC.encodeExpression(source)).append('\n')
-                    .append(CODEC.encodeExpression(target)).append('\n').append(lineage);
+                provenance.append('\n').append(sourceKey).append('\n').append(targetKey).append('\n').append(lineage);
                 if (includeSubpaths) {
                     int allowance = parent.bounds.maximumExamples() / solutions.size() - 1;
                     addTaskSubpaths(solution.evidence().witness(), observationId, parent.bounds,

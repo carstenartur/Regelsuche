@@ -30,6 +30,12 @@ class TaskSubpathLearningTest {
         assertEquals(0, endpoints.next().schemaCount());
         assertTrue(local.promoted(), () -> local.reason() + ": " + local.attempts());
         assertTrue(local.work().formation() > endpoints.work().formation());
+        var otherLessons = List.of(task("((z+0)*1)+(c+0)", 3), lessons.get(1));
+        var other = initial.learnLocalBatch(otherLessons, validation, CumulativeTaskKnowledge.DEFAULT_LEARNING_WORK);
+        var firstSupport = local.attempts().stream().filter(a -> a.status().equals("PROVED")).findFirst().orElseThrow();
+        var otherSupport = other.attempts().stream().filter(a -> a.status().equals("PROVED")).findFirst().orElseThrow();
+        assertEquals(firstSupport.detail(), otherSupport.detail()); // the same mathematical identity
+        assertNotEquals(firstSupport.observationIds().getFirst(), otherSupport.observationIds().getFirst());
         var restored = CumulativeTaskKnowledge.restore(inventory, local.next().toCanonicalJson());
         var held = task("7+(((d*e+0)*1))", 5);
         var learned = restored.solve(held, CumulativeTaskKnowledge.Strategy.KNOWLEDGE_FIRST);
@@ -69,5 +75,18 @@ class TaskSubpathLearningTest {
         assertFalse(TaskSubpathMiner.mine(witness, bounds, 0, work, collect));
         assertTrue(ids.isEmpty());
         assertTrue(work.units > 0);
+    }
+
+    @Test void keepsCompletedChildWorkBeforeARootRewrite() {
+        var initial = CumulativeTaskKnowledge.empty(TraceStrategyTransferExample.inventory());
+        var execution = initial.solve(task("(p-u)+((u+0)*1)", 1), CumulativeTaskKnowledge.Strategy.BASELINE);
+        assertTrue(execution.solved());
+        var witness = execution.solution().orElseThrow().evidence().witness();
+        assertEquals(3, witness.size());
+        var observations = new ArrayList<String>();
+        TaskSubpathMiner.mine(witness, CheckedLearnedSchemaModel.Bounds.defaults(), 32, new CheckedSchemaSupport.Work(),
+            (id, source, target) -> observations.add(id + ":" + de.regelsuche.parse.ExpressionFormatter.format(source)
+                + " => " + de.regelsuche.parse.ExpressionFormatter.format(target)));
+        assertTrue(observations.contains("R[0,1,]:(u + 0) * 1 => u"), observations::toString);
     }
 }
