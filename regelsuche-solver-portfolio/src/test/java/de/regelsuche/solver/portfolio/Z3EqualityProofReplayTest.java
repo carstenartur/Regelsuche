@@ -348,6 +348,76 @@ class Z3EqualityProofReplayTest {
         }
     }
 
+    @Test
+    void replaysNativeNonzeroConstantCancellation() {
+        // Captured from Z3 4.13.3.0: 2*x = 0 implies x = 0.
+        String proof = """
+            ((set-logic ALL)
+            (proof
+            (let (($x41 (= x 0.0)))
+            (let (($x51 (not $x41)))
+            (let ((@x50 (mp (asserted (not (= x (to_real 0)))) (rewrite (= (not (= x (to_real 0))) $x51)) $x51)))
+            (let ((?x34 (* 2.0 x)))
+            (let (($x38 (= ?x34 0.0)))
+            (let ((?x28 (to_real 0)))
+            (let ((?x26 (* (to_real 2) x)))
+            (let (($x29 (= ?x26 ?x28)))
+            (let ((@x36 (rewrite (= ?x28 0.0))))
+            (let ((@x45 (trans (monotonicity (rewrite (= ?x26 ?x34)) @x36 (= $x29 $x38)) (rewrite (= $x38 $x41)) (= $x29 $x41))))
+            (let ((@x46 (mp (asserted $x29) @x45 $x41)))
+            (unit-resolution @x46 @x50 false))))))))))))))
+            """;
+        assertTrue(Z3EqualityProofReplay.verifies(statement("x", "0", "2*x = 0"), proof));
+        String zeroFactor = proof.replace("2.0 x", "0.0 x").replace("(to_real 2)", "(to_real 0)");
+        assertFalse(Z3EqualityProofReplay.verifies(statement("x", "0", "0*x = 0"), zeroFactor));
+    }
+
+    @Test
+    void replaysNativeAffineEquationRescaling() {
+        // Captured from Z3 4.13.3.0: 2*x = 2 implies x = 1.
+        String proof = """
+            ((set-logic ALL)
+            (proof
+            (let (($x39 (= x 1.0)))
+            (let (($x50 (not $x39)))
+            (let ((@x52 (mp (asserted (not (= x (to_real 1)))) (rewrite (= (not (= x (to_real 1))) $x50)) $x50)))
+            (let ((?x32 (* 2.0 x)))
+            (let (($x34 (= ?x32 2.0)))
+            (let ((?x25 (to_real 2)))
+            (let ((?x26 (* ?x25 x)))
+            (let (($x27 (= ?x26 ?x25)))
+            (let ((@x31 (rewrite (= ?x25 2.0))))
+            (let ((@x43 (trans (monotonicity (rewrite (= ?x26 ?x32)) @x31 (= $x27 $x34)) (rewrite (= $x34 $x39)) (= $x27 $x39))))
+            (let ((@x44 (mp (asserted $x27) @x43 $x39)))
+            (unit-resolution @x44 @x52 false))))))))))))))
+            """;
+        assertTrue(Z3EqualityProofReplay.verifies(statement("x", "1", "2*x = 2"), proof));
+        assertFalse(Z3EqualityProofReplay.verifies(statement("x", "3", "2*x = 2"),
+            proof.replace("1.0", "3.0").replace("(to_real 1)", "(to_real 3)")));
+    }
+
+    @Test
+    void proportionalityIsForZeroEquationsOnlyAndNeverCancelsVariableFactors() {
+        String target = "(= (+ x y) 0.0)";
+        String source = "(= (* 0.5 (+ x y)) 0.0)";
+        assertTrue(Z3EqualityProofReplay.verifies(statement("x+y", "0", "0.5*(x+y) = 0"),
+            equationRewrite(source, target)));
+        String reverse = "(= 0.0 (* 3.0 (+ x y)))";
+        assertTrue(Z3EqualityProofReplay.verifies(statement("x+y", "0", "0 = 3*(x+y)"),
+            equationRewrite(reverse, target)));
+        assertFalse(Z3EqualityProofReplay.verifies(statement("x", "0", "x*y = 0"),
+            equationRewrite("(= (* x y) 0.0)", "(= x 0.0)")));
+        assertFalse(Z3EqualityProofReplay.verifies(statement("x", "0", "2*x+4 = 0"),
+            equationRewrite("(= (+ (* 2.0 x) 4.0) 0.0)", "(= x 0.0)")));
+        assertFalse(Z3EqualityProofReplay.verifies(statement("2*x", "x"),
+            contradiction("(rewrite (= (* 2.0 x) x))", "(= (* 2.0 x) x)")));
+    }
+
+    private static String equationRewrite(String source, String target) {
+        return contradiction("(mp (asserted " + source + ") (rewrite (= " + source + " "
+            + target + ")) " + target + ")", target);
+    }
+
     private static String nestedPowers(String term, int depth) {
         for (int i = 0; i < depth; i++) term = "(^ " + term + " 20.0)";
         return term;

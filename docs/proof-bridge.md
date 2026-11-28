@@ -139,7 +139,13 @@ minimal. Boolean equality, negation and constants support the
 equivalences used by native normalization proofs; `mp` checks both sides of
 the claimed equivalence. Every polynomial `rewrite` is checked without
 premises by `PolynomialNormalFormSolverBackend`. The native rule name grants
-no authority. A failed polynomial identity check is never interpreted as a
+no authority. For real equations only, both differences may also be compared
+up to a nonzero rational scalar: their exact monic normal forms must coincide,
+including the distinction between zero and nonzero polynomials. This does not
+permit cancelling a variable factor, equating rescaled expression values, or
+reversing an inequality. These checks share the existing polynomial work
+limits and cache separately from ordinary identity checks.
+A failed polynomial identity check is never interpreted as a
 disequality valid for every assignment: `x = 0` is neither constantly true
 nor constantly false.
 

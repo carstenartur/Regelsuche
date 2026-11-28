@@ -128,14 +128,11 @@ final class Z3PolynomialProofRewrites {
             || polynomial(values.difference(right, left), product));
     }
 
-    /** Both equations hold exactly when their difference is zero. Only polynomial identities
-     * between differences (possibly with reversed orientation) justify this rewrite. */
+    /** Nonzero constant rescaling of a polynomial difference preserves its zero set. */
     private boolean equivalentRealEquations(Equality first, Equality second) {
         if (!(first.left() instanceof Real a) || !(first.right() instanceof Real b)
                 || !(second.left() instanceof Real c) || !(second.right() instanceof Real d)) return false;
-        Real difference = values.difference(a, b);
-        return polynomial(difference, values.difference(c, d))
-            || polynomial(difference, values.difference(d, c));
+        return checkPolynomial(values.difference(a, b), values.difference(c, d), true);
     }
 
     /** null means not proved constant; REFUTED polynomial identity is not universal disequality. */
@@ -187,18 +184,28 @@ final class Z3PolynomialProofRewrites {
     }
 
     private boolean polynomial(Real left, Real right) {
-        var key = new Pair(left, right);
+        return checkPolynomial(left, right, false);
+    }
+
+    private boolean checkPolynomial(Real left, Real right, boolean proportional) {
+        var key = new Pair(left, right, proportional);
         Boolean old = cache.get(key);
         if (old != null) return old;
         long estimate = (long) (left.size() + right.size()) * (left.monomials() + right.monomials());
         if (++calls > 128 || (admittedWork += estimate) > 262_144) throw new Invalid();
-        var obligation = Obligation.create("native-polynomial-rewrite", source.declarations(), source.theories(),
-            List.of(), new Goal(Relation.EQUALS, left.expression(), right.expression()),
-            RequestedEvidence.SYMBOLIC_CERTIFICATE, source.provenance());
-        boolean result = backend.execute(obligation).result().status() == ResultStatus.CONFIRMED;
+        boolean result = proportional
+            ? backend.proportionalEquationDifferences(left.expression(), right.expression())
+            : polynomialIdentity(left, right);
         cache.put(key, result);
         return result;
     }
 
-    private record Pair(Real left, Real right) { }
+    private boolean polynomialIdentity(Real left, Real right) {
+        var obligation = Obligation.create("native-polynomial-rewrite", source.declarations(), source.theories(),
+            List.of(), new Goal(Relation.EQUALS, left.expression(), right.expression()),
+            RequestedEvidence.SYMBOLIC_CERTIFICATE, source.provenance());
+        return backend.execute(obligation).result().status() == ResultStatus.CONFIRMED;
+    }
+
+    private record Pair(Real left, Real right, boolean proportional) { }
 }
