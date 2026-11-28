@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: '06d0075774b139bfe7f8c9eee35d5d50f202bb97'
+          ref: '27bb13a8c861578912ef968ab73b2d06cb95fce7'
           persist-credentials: false
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
@@ -20,7 +20,7 @@ jobs:
           java-version: '25'
           cache: maven
       - name: Compile and test retained proofs and admission
-        run: mvn -B -ntp -pl regelsuche-learning -am -Dtest=ProofDepthChallengeTest,CheckedSchemaRetentionTest,CostAwareTacticRouterTest,CheckedSchemaSelectionDifferentialTest -Dsurefire.failIfNoSpecifiedTests=false test
+        run: mvn -B -ntp -pl regelsuche-learning -am -Dtest=SharedNodeCountTest,ProofDepthChallengeTest,CheckedSchemaRetentionTest,CostAwareTacticRouterTest,CheckedSchemaSelectionDifferentialTest -Dsurefire.failIfNoSpecifiedTests=false test
       - name: Reproduce acquisition and training
         shell: bash
         run: |
@@ -29,25 +29,63 @@ jobs:
           done
           diff -rq "$RUNNER_TEMP/train-0" "$RUNNER_TEMP/train-1"
           sha256sum "$RUNNER_TEMP"/train-0/*
-      - name: Audit acquisition and calibration without creating final cases
+      - name: Evaluate unchanged freeze in opposite arm orders
+        env:
+          FREEZE: '27bb13a8c861578912ef968ab73b2d06cb95fce7'
+        run: |
+          diff -rq docs/research/prospective-retained-tactics/training "$RUNNER_TEMP/train-0"
+          for pass in 0 1; do
+            mvn -B -ntp -pl regelsuche-learning -am -Dtest=RetainedTacticStudyTest -Dsurefire.failIfNoSpecifiedTests=false -Dretained.phase=final "-Dretained.research=$PWD/docs/research" "-Dretained.freeze=$FREEZE" "-Dretained.rotation=$pass" "-Dretained.output=$RUNNER_TEMP/final-$pass" test
+          done
+          python3 docs/research/prospective-retained-tactics/verify.py "$RUNNER_TEMP/final-0" "$RUNNER_TEMP/final-1" "$FREEZE" > "$RUNNER_TEMP/verification.json"
+          python3 - "$RUNNER_TEMP" <<'PY'
+          from pathlib import Path
+          import json,sys
+          root=Path(sys.argv[1])
+          out={}
+          all_checks=json.loads((root/"verification.json").read_text())
+          for family,v in all_checks["families"].items():
+              p=root/"final-0"/family
+              paths=json.loads((p/"paths.json").read_text())
+              rows={arm:[json.loads(s) for s in (p/(arm+".jsonl")).read_text().splitlines()] for arm in v["arms"]}
+              picked={}
+              for label,test in {
+                  "singleRuleWitness":lambda i: any(x["index"]==i for x in v["timelySingleRemovals"]),
+                  "newLocalSolved":lambda i: rows["RETAINED"][i]["solved"] and not rows["BASE"][i]["solved"],
+                  "learnedProof":lambda i: rows["RETAINED"][i]["solved"] and bool(rows["RETAINED"][i]["learnedSchemas"]),
+                  "lostLocalSolved":lambda i: rows["BASE"][i]["solved"] and not rows["RETAINED"][i]["solved"]}.items():
+                  i=next((i for i in range(len(rows["BASE"])) if test(i)),None)
+                  if i is not None:
+                      q=rows["RETAINED"][i]
+                      picked[label]={"index":i,"source":q["source"],"cap":q["cap"],"output":q["output"],
+                          "comparisons":{arm:{"solved":cols[i]["solved"],"score":cols[i]["score"],"cost":sum(cols[i][k] for k in ("selection","query","replay"))} for arm,cols in rows.items()},
+                          "sequence":[{"rule":t["rule"],"schema":t["schema"]} for t in paths[q["pathHash"]]]}
+              out[family]=picked
+          (root/"examples.json").write_text(json.dumps(out,indent=2)+"\n")
+          PY
+      - name: Reproduce earlier public development streams
         shell: bash
         run: |
-          mkdir -p docs/research/prospective-retained-tactics/training
-          cp "$RUNNER_TEMP"/train-0/* docs/research/prospective-retained-tactics/training/
-          python3 - <<'PY'
-          import runpy, sys
-          from pathlib import Path
-          path=Path("docs/research/prospective-retained-tactics").resolve()
-          sys.path.insert(0,str(path))
-          v=runpy.run_path(str(path/"verify.py"))
-          models, receipt, sources = v["materials"]()
-          print("Checked purchased models", [(k,len(m[1])) for k,m in models.items()], "calibration",len(receipt["calibrationSources"]))
-          PY
+          for pass in 0 1; do
+            mvn -B -ntp -pl regelsuche-learning -am -Dtest=RetainedTacticDevelopmentTest -Dsurefire.failIfNoSpecifiedTests=false "-Dretained.research=$PWD/docs/research" "-Dretained.rotation=$pass" "-Dretained.development.output=$RUNNER_TEMP/dev-$pass" test
+          done
+          python3 docs/research/prospective-retained-tactics/development/summarize.py "$RUNNER_TEMP/dev-0" "$RUNNER_TEMP/dev-1" --training "$RUNNER_TEMP/train-0" > "$RUNNER_TEMP/development.json"
+      - name: Measure the primitive node-count optimization on the same cases
+        env:
+          FREEZE: '27bb13a8c861578912ef968ab73b2d06cb95fce7'
+        run: |
+          for pass in 0 1; do
+            mvn -B -ntp -pl regelsuche-learning -am -Dtest=SharedNodeCountStudyTest -Dsurefire.failIfNoSpecifiedTests=false "-Dshared.counts.output=$RUNNER_TEMP/counts-$pass.json" "-Dshared.counts.rotation=$pass" "-Dretained.freeze=$FREEZE" "-Dshared.counts.official=$RUNNER_TEMP/final-$pass" test
+          done
+          cmp "$RUNNER_TEMP/counts-0.json" "$RUNNER_TEMP/counts-1.json"
+          cp "$RUNNER_TEMP/counts-0.json" "$RUNNER_TEMP/standalone.json"
+      - name: Verify the restricted matcher development receipt
+        run: python3 docs/research/prospective-retained-tactics/verify_sparse.py docs/research/prospective-retained-tactics/development/thin-calibration.json
       - name: Make the independently reproducible measurements available
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: retained-tactic-development-06d007577
+          name: retained-tactic-final-27bb13a8c
           retention-days: 90
           path: |
             ${{ runner.temp }}/train-0/
@@ -57,6 +95,8 @@ jobs:
             ${{ runner.temp }}/final-1/
             ${{ runner.temp }}/development.json
             ${{ runner.temp }}/verification.json
+            ${{ runner.temp }}/examples.json
+            ${{ runner.temp }}/standalone.json
       - name: Print machine-readable deterministic receipts
         if: always()
         shell: python
@@ -64,10 +104,44 @@ jobs:
           from pathlib import Path
           import base64, hashlib, os
           root = Path(os.environ["RUNNER_TEMP"])
-          files = [root/"development.json",root/"verification.json",*sorted((root/"train-0").glob("*.json"))]
+          files = [root/"development.json",root/"verification.json",root/"examples.json",root/"standalone.json",*sorted((root/"train-0").glob("*.json"))]
           for path in files:
               if not path.is_file(): continue
               data = path.read_bytes()
               print("RECEIPT",path.name,len(data),hashlib.sha256(data).hexdigest())
               for i in range(0,len(data),6000):
                   print("RETAINED-DATA",path.name,str(i//6000),base64.b64encode(data[i:i+6000]).decode())
+          import gzip, json
+          for family in ["C","D"]:
+              plain = root/"final-0"/family
+              if not plain.is_dir(): continue
+              for src in sorted(plain.iterdir()):
+                  if not src.is_file(): continue
+                  if "elapsed" in src.name:
+                      repeat=root/"final-1"/family/src.name
+                      data=json.dumps([json.loads(src.read_bytes()),json.loads(repeat.read_bytes())],separators=(",",":")).encode()
+                      name=family+"__timings.json.gz"
+                  else:
+                      data=src.read_bytes()
+                      name=family+"__"+src.name+".gz"
+                  compressed=gzip.compress(data,compresslevel=9,mtime=0)
+                  print("RECEIPT",name,len(compressed),hashlib.sha256(compressed).hexdigest())
+                  for i in range(0,len(compressed),6000):
+                      print("RETAINED-DATA",name,str(i//6000),base64.b64encode(compressed[i:i+6000]).decode())
+  reactor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: '27bb13a8c861578912ef968ab73b2d06cb95fce7'
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Run every ordinary test in the affected Maven reactor
+        run: |
+          java regelsuche-core/src/test/java/de/regelsuche/docs/StrategyCodeReferences.java --check
+          mvn -B -ntp -pl regelsuche-learning -am test
