@@ -15,6 +15,7 @@ import java.util.TreeMap;
 /** Opt-in live typed execution of admitted traces from the existing target-free TRAIN learner. */
 public final class TypedLearnedMoveInventory {
     private final TraceRewriteStrategyLearner.FrozenStrategy formation;
+    private final EvolutionGenome inventory;
     private final String inventoryHash;
     private final List<MoveProvider> primitives;
     private final List<AstRewriteTransport> primitiveTransports;
@@ -32,6 +33,7 @@ public final class TypedLearnedMoveInventory {
 
     private TypedLearnedMoveInventory(EvolutionGenome inventory, TraceRewriteStrategyLearner.FrozenStrategy formation) {
         this.formation = formation;
+        this.inventory = inventory;
         inventoryHash = inventory.contentHash();
         var bounds = inventory.budget();
         if (bounds.maxCandidatesPerState() > 128) {
@@ -88,6 +90,18 @@ public final class TypedLearnedMoveInventory {
         return new CheckedSchemaTaskSolver(newSearchSession(false, 0, 0), null);
     }
 
+    /**
+     * Also use the primitive batch scheduler when no learned pattern can appear under any
+     * sequence of this inventory's primitive rewrites. The paid route is limited to this
+     * solver's complete, unaugmented primitive inventory.
+     */
+    public CheckedSchemaTaskSolver newTaskSolverWithSelection(CheckedLearnedSchemaModel model,
+            boolean primitiveReachability) {
+        var selected = newTaskSolverWithSelection(model);
+        if (!primitiveReachability) return selected;
+        return selected.withPrimitiveRoute(primitives, PrimitiveSchemaReachability.compile(inventory, model));
+    }
+
     /** Apply one explicitly selected capability profile to the same primitive frontier. */
     public CheckedSchemaTaskSolver newTaskSolverWithProfile(TaskConstructionProfile profile) {
         return java.util.Objects.requireNonNull(profile, "profile").attach(newTaskSolver());
@@ -108,14 +122,26 @@ public final class TypedLearnedMoveInventory {
 
     /** Optional existing shape index; preparation and each dispatch remain explicitly paid. */
     public CheckedSchemaTaskSolver newTaskSolver(CheckedLearnedSchemaModel model, boolean indexed) {
+        return prepareTaskSolver(model, indexed, false);
+    }
+
+    /** Use the checked domain size and source pattern shapes to bound each state's candidate sites. */
+    public CheckedSchemaTaskSolver newTaskSolverWithSelection(CheckedLearnedSchemaModel model) {
+        return prepareTaskSolver(model, false, true);
+    }
+
+    private CheckedSchemaTaskSolver prepareTaskSolver(CheckedLearnedSchemaModel model, boolean indexed,
+            boolean selectSites) {
         java.util.Objects.requireNonNull(model, "model");
         if (!inventoryHash.equals(model.inventoryHash())) throw new IllegalArgumentException("schema inventory mismatch");
         var included = model.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id)
             .collect(java.util.stream.Collectors.toUnmodifiableSet());
-        var plan = indexed
+        var plan = selectSites
+            ? CheckedSchemaMatcherPlan.prepareSelected(model, model.bounds().maximumSchemas(), Map.of(), included) : indexed
             ? CheckedSchemaMatcherPlan.prepareIndexed(model, model.bounds().maximumSchemas(), Map.of(), included)
             : CheckedSchemaMatcherPlan.prepare(model, model.bounds().maximumSchemas(), Map.of(), included);
-        return new CheckedSchemaTaskSolver(newSchemaSearchSession(model, List.of(plan.provider())), plan.compilationReceipt());
+        return new CheckedSchemaTaskSolver(newSchemaSearchSession(model, List.of(plan.provider())), plan.compilationReceipt(),
+            selectSites ? plan : null);
     }
 
     /** Generalizes actual successful observations, then proves each symbolic statement. */

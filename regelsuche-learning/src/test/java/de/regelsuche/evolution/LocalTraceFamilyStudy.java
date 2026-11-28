@@ -19,7 +19,14 @@ public final class LocalTraceFamilyStudy {
     private static final String PROTOCOL = "f070e56c9c7537010a963aea90d91979d1334f44";
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
     private static final EvolutionGenome INVENTORY = TraceStrategyTransferExample.inventory();
-    enum Arm { BASE, ORDER, LOCAL, DROP, WHOLE, HAND }
+    enum Arm { BASE, ORDER, LOCAL, DROP, WHOLE, HAND, INDEXED, SELECTED, ROUTED, SELECTED_DROP, ROUTED_DROP;
+        boolean ablated() { return this == DROP || this == SELECTED_DROP || this == ROUTED_DROP; }
+        boolean usesModel() { return this != BASE && this != ORDER && this != HAND; }
+    }
+    private static final List<Arm> ORIGINAL_ARMS = List.of(Arm.BASE, Arm.ORDER, Arm.LOCAL, Arm.DROP, Arm.WHOLE, Arm.HAND);
+    private static final List<Arm> SELECTION_ARMS = List.of(Arm.BASE, Arm.DROP, Arm.LOCAL, Arm.INDEXED,
+        Arm.SELECTED, Arm.ROUTED, Arm.SELECTED_DROP, Arm.ROUTED_DROP);
+    private static final String SELECTION_FREEZE = "sha256:0c7296ad0464030e227d7e3535d7ea3449a04b412407ef3a2396a4f212d21c06";
 
     record Trace(String source, boolean solved, long work, List<String> selected) { }
     record Gate(String source, long baseline, long previous, long candidate, Long routed) { }
@@ -41,9 +48,13 @@ public final class LocalTraceFamilyStudy {
         if (args.length == 2 && args[0].equals("train")) {
             train(Path.of(args[1]));
         } else if (args.length == 5 && args[0].equals("final")) {
-            evaluate(Path.of(args[1]), args[2], Integer.parseInt(args[3]), Path.of(args[4]));
+            int rotation = Integer.parseInt(args[3]);
+            if (rotation < 0 || rotation > 2) throw new IllegalArgumentException("invalid FINAL rotation");
+            evaluate(Path.of(args[1]), args[2], rotation, ORIGINAL_ARMS, 2, Path.of(args[4]));
+        } else if (args.length == 4 && args[0].equals("selection")) {
+            evaluate(Path.of(args[1]), SELECTION_FREEZE, Integer.parseInt(args[2]), SELECTION_ARMS, 1, Path.of(args[3]));
         } else {
-            throw new IllegalArgumentException("train DIR | final DIR SHA256 ROTATION OUTPUT.json");
+            throw new IllegalArgumentException("train DIR | final DIR SHA256 ROTATION OUTPUT.json | selection DIR ROTATION OUTPUT.json");
         }
     }
 
@@ -90,9 +101,10 @@ public final class LocalTraceFamilyStudy {
                 v.automatic().map(CumulativeTaskKnowledge.Execution::totalWork).orElse(null))).toList(), update.attempts());
     }
 
-    private static void evaluate(Path dir, String digest, int rotation, Path output) throws IOException {
+    private static void evaluate(Path dir, String digest, int rotation, List<Arm> arms,
+            int rotationStride, Path output) throws IOException {
         String original = Files.readString(dir.resolve("freeze.json"));
-        if (!SchematicProofPlan.hash(original).equals(digest) || rotation < 0 || rotation > 2) {
+        if (!SchematicProofPlan.hash(original).equals(digest) || rotation < 0 || rotation >= arms.size()) {
             throw new IllegalArgumentException("wrong freeze digest or rotation");
         }
         Freeze freeze = JSON.readValue(original, Freeze.class);
@@ -100,9 +112,8 @@ public final class LocalTraceFamilyStudy {
             throw new IllegalArgumentException("wrong experiment or primitive inventory");
         }
         var results = new ArrayList<Observation>();
-        var arms = List.of(Arm.values());
         for (int index = 0; index < arms.size(); index++) {
-            Arm arm = arms.get((index + rotation * 2) % arms.size());
+            Arm arm = arms.get((index + rotation * rotationStride) % arms.size());
             results.add(evaluateArm(arm, dir, freeze));
         }
         writeJson(output, new Replicate(rotation, digest, results));
@@ -118,7 +129,7 @@ public final class LocalTraceFamilyStudy {
         int schemas = 0;
         if (arm == Arm.ORDER) acquisition = freeze.orderTrainingWork() + freeze.tallyWork();
         if (arm == Arm.HAND) solver = primitives.newTaskSolverWithProfile(TaskConstructionProfile.POLYNOMIAL_DIRECT_V1);
-        if (arm == Arm.LOCAL || arm == Arm.DROP || arm == Arm.WHOLE) {
+        if (arm.usesModel()) {
             boolean whole = arm == Arm.WHOLE;
             var formation = whole ? freeze.whole() : freeze.local();
             String snapshot = Files.readString(dir.resolve(whole ? "whole.json" : "local.json"));
@@ -128,7 +139,14 @@ public final class LocalTraceFamilyStudy {
             var model = CheckedLearnedSchemaModel.load(TaskKnowledgeSnapshot.decode(snapshot).model(), INVENTORY.contentHash());
             schemas = model.schemas().size();
             if (schemas != formation.schemas()) throw new IllegalArgumentException("changed schema count");
-            if (schemas > 0) solver = primitives.newTaskSolver(model);
+            if (schemas > 0) {
+                solver = switch (arm) {
+                    case INDEXED -> primitives.newTaskSolver(model, true);
+                    case SELECTED, SELECTED_DROP -> primitives.newTaskSolverWithSelection(model);
+                    case ROUTED, ROUTED_DROP -> primitives.newTaskSolverWithSelection(model, true);
+                    default -> primitives.newTaskSolver(model);
+                };
+            }
             setup = model.loadWork();
             acquisition = formation.costs().total() + freeze.tallyWork();
         }
@@ -137,7 +155,7 @@ public final class LocalTraceFamilyStudy {
         for (var input : LocalTraceFamilyCases.finalCases()) {
             var task = input.task();
             var result = arm == Arm.BASE || arm == Arm.HAND ? solver.solve(task).evidence()
-                : ordered(solver.problem(task), task, freeze.priorities(), arm == Arm.DROP);
+                : ordered(solver.problem(task), task, freeze.priorities(), arm.ablated());
             rows.add(row(input, result));
         }
         return new Observation(arm, acquisition, setup, schemas, System.nanoTime() - wall,

@@ -121,6 +121,47 @@ class CheckedSchemaIndexedDispatchTest {
         assertEquals(paid, cursor.snapshot().work().metrics().totalWorkUnitsV2());
     }
 
+    @Test void firstApplicationPaysForTheActualImmutableOccurrencePath() {
+        var selected = CheckedSchemaMatcherPlan.prepareSelected(model, 1, Map.of(), Set.of(schemaId));
+        String input = "(a+b)*(a-b)+b*b";
+        for (int depth = 0; depth <= 4; depth++) {
+            long required = (depth <= 2 ? 1L : 3L) * (depth + 1L);
+            boolean applicationStarted = false;
+            try (var cursor = selected.provider().openSession(state(input), context())) {
+                for (int pulls = 0; pulls < 1000; pulls++) {
+                    var before = cursor.snapshot().work();
+                    cursor.next(1);
+                    var after = cursor.snapshot().work();
+                    if (after.prepaidApplications().openApplications() > 0) {
+                        assertEquals(required, after.operations().getOrDefault("MATCH", 0L)
+                            - before.operations().getOrDefault("MATCH", 0L), "depth " + depth);
+                        applicationStarted = true;
+                        break;
+                    }
+                }
+            }
+            assertTrue(applicationStarted, "depth " + depth);
+            input = "c+(" + input + ")";
+        }
+    }
+
+    @Test void selectedPlanPreservesOrderCompletenessAndIndependentTinyPulls() {
+        var selected = CheckedSchemaMatcherPlan.prepareSelected(model, 1, Map.of(), Set.of(schemaId));
+        assertNotEquals(plan(model).provider().contractDefinition(), selected.provider().contractDefinition());
+        assertEquals(CheckedSchemaMatcherPlan.SELECTED_WORK_REVISION, selected.compilationReceipt().revision());
+        assertDoesNotThrow(() -> RetainedGraph.measure(selected));
+        var inventory = (NativeVerifierProvider.ExecutionInventory) model.nativeVerifier();
+        assertNull(inventory.executionRevision(selected.nativeProvider()));
+        for (String input : List.of(PAIR, "c+(d+(e+((a+b)*(a-b)+b*b)))", "a+b",
+                "(x+y)*(x-y)+z*z", "((a+b)*(a-b)+b*b)+(1/x)")) {
+            var original = drain(plan(model), input, 100_000);
+            var actual = drain(selected, input, 1);
+            assertEquals(original.transformations(), actual.transformations(), input);
+            assertEquals(original.status(), actual.status(), input);
+            assertEquals(original.complete(), actual.complete(), input);
+        }
+    }
+
     @Test void retainPaidPreparationAndQueryDiagnosticsWithoutAssumingAWinner() {
         var original = plan(model);
         var indexed = original.withIndexedDispatch();
