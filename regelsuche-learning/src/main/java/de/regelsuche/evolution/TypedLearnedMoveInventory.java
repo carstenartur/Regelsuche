@@ -99,7 +99,8 @@ public final class TypedLearnedMoveInventory {
             boolean primitiveReachability) {
         var selected = newTaskSolverWithSelection(model);
         if (!primitiveReachability) return selected;
-        return selected.withPrimitiveRoute(primitives, PrimitiveSchemaReachability.compile(inventory, model));
+        return selected.withPrimitiveRoute(primitives, PrimitiveSchemaReachability.compile(inventory, model),
+            PrimitiveSchemaReachability.REVISION);
     }
 
     /** Apply one explicitly selected capability profile to the same primitive frontier. */
@@ -122,16 +123,22 @@ public final class TypedLearnedMoveInventory {
 
     /** Optional existing shape index; preparation and each dispatch remain explicitly paid. */
     public CheckedSchemaTaskSolver newTaskSolver(CheckedLearnedSchemaModel model, boolean indexed) {
-        return prepareTaskSolver(model, indexed, false);
+        return prepareTaskSolver(model, indexed, false, false);
     }
 
     /** Use the checked domain size and source pattern shapes to bound each state's candidate sites. */
     public CheckedSchemaTaskSolver newTaskSolverWithSelection(CheckedLearnedSchemaModel model) {
-        return prepareTaskSolver(model, false, true);
+        return prepareTaskSolver(model, false, true, false);
+    }
+
+    /** Recover each concrete substitution independently from the source during both proof checks. */
+    public CheckedSchemaTaskSolver newTaskSolverWithRegeneratedWitness(CheckedLearnedSchemaModel model) {
+        return prepareTaskSolver(model, false, true, true).withPrimitiveRoute(primitives,
+            PrimitiveSchemaReachability.compile(inventory, model), PrimitiveSchemaReachability.REVISION + "+regenerated-witness/v1");
     }
 
     private CheckedSchemaTaskSolver prepareTaskSolver(CheckedLearnedSchemaModel model, boolean indexed,
-            boolean selectSites) {
+            boolean selectSites, boolean deriveBindings) {
         java.util.Objects.requireNonNull(model, "model");
         if (!inventoryHash.equals(model.inventoryHash())) throw new IllegalArgumentException("schema inventory mismatch");
         var included = model.schemas().stream().map(CheckedLearnedSchemaModel.Schema::id)
@@ -140,7 +147,7 @@ public final class TypedLearnedMoveInventory {
             ? CheckedSchemaMatcherPlan.prepareSelected(model, model.bounds().maximumSchemas(), Map.of(), included) : indexed
             ? CheckedSchemaMatcherPlan.prepareIndexed(model, model.bounds().maximumSchemas(), Map.of(), included)
             : CheckedSchemaMatcherPlan.prepare(model, model.bounds().maximumSchemas(), Map.of(), included);
-        return new CheckedSchemaTaskSolver(newSchemaSearchSession(model, List.of(plan.provider())), plan.compilationReceipt(),
+        return new CheckedSchemaTaskSolver(newSchemaSearchSession(model, List.of(plan.provider()), deriveBindings), plan.compilationReceipt(),
             selectSites ? plan : null);
     }
 
@@ -157,11 +164,16 @@ public final class TypedLearnedMoveInventory {
     }
 
     public SearchSession newSchemaSearchSession(CheckedLearnedSchemaModel model, List<MoveProvider> schemaProviders) {
+        return newSchemaSearchSession(model, schemaProviders, false);
+    }
+
+    private SearchSession newSchemaSearchSession(CheckedLearnedSchemaModel model, List<MoveProvider> schemaProviders,
+            boolean deriveBindings) {
         java.util.Objects.requireNonNull(model, "model");
         if (!inventoryHash.equals(model.inventoryHash())) throw new IllegalArgumentException("schema inventory mismatch");
         var selected = new ArrayList<>(primitives);
         selected.addAll(schemaProviders);
-        var schemas = model.verifier();
+        var schemas = model.verifier(deriveBindings);
         var primitive = verifier();
         return new SearchSession(selected, List.of(), (source, move, context) ->
             move.sourceKind() == SearchMove.SourceKind.PRIMITIVE ? primitive.verify(source, move, context)
